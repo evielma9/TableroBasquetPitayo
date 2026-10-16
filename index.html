@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Vistas Adaptables</title>
+    <title>Tablero de Básquetbol con Control de Periodos Superior</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -20,7 +20,7 @@
     <!-- SELECCIÓN DE MODO -->
     <div id="mode-selector" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
-            <h1 class="text-2xl font-bold mb-2 text-amber-400">🏀 Marcador con Vistas Adaptables</h1>
+            <h1 class="text-2xl font-bold mb-2 text-amber-400">🏀 Tablero de Básquetbol</h1>
             <p class="text-slate-400 text-sm mb-6">Selecciona cómo deseas abrir esta pantalla:</p>
             <div class="space-y-4">
                 <button onclick="selectMode('control')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-6 rounded-xl transition shadow-lg cursor-pointer">
@@ -54,22 +54,33 @@
             <button onclick="changeModePrompt()" class="text-xs text-slate-400 hover:text-white underline cursor-pointer">Cambiar vista</button>
         </header>
 
-        <!-- CRONÓMETRO Y CUARTOS -->
+        <!-- CRONÓMETRO, PERIODO Y CONTROLES DE TIEMPO -->
         <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-3">
                 <span class="text-slate-400 text-sm uppercase font-semibold">Periodo:</span>
                 <span id="display-periodo" class="text-2xl font-bold font-digital text-amber-400">1Q</span>
             </div>
+
+            <!-- Botones de Cambio de Periodo (Visibles solo en Mesa de Control) -->
+            <div id="period-selector-controls" class="hidden items-center gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                <button onclick="setPeriod('1Q')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 transition cursor-pointer">1Q</button>
+                <button onclick="setPeriod('2Q')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 transition cursor-pointer">2Q</button>
+                <button onclick="setPeriod('3Q')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 transition cursor-pointer">3Q</button>
+                <button onclick="setPeriod('4Q')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 transition cursor-pointer">4Q</button>
+                <button onclick="setPeriod('OT')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-950 hover:bg-rose-900 text-rose-300 transition cursor-pointer">OT</button>
+            </div>
+
             <div class="flex items-center gap-4">
                 <div id="display-cronometro" class="text-4xl sm:text-5xl font-digital font-black tracking-widest text-white bg-slate-950 px-6 py-2 rounded-xl border border-slate-800">
                     10:00
                 </div>
             </div>
+
             <div id="cronometro-controls" class="hidden flex items-center gap-2">
-                <button onclick="toggleTimer()" id="btn-timer" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition">Iniciar</button>
-                <button onclick="resetTimer()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-3 py-2 rounded-lg text-sm transition">Reiniciar</button>
-                <button onclick="adjustTime(60)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-2 rounded-lg text-xs">+1 min</button>
-                <button onclick="adjustTime(-60)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-2 rounded-lg text-xs">-1 min</button>
+                <button onclick="toggleTimer()" id="btn-timer" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition cursor-pointer">Iniciar</button>
+                <button onclick="resetTimer()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-3 py-2 rounded-lg text-sm transition cursor-pointer">Reiniciar</button>
+                <button onclick="adjustTime(60)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-2 rounded-lg text-xs cursor-pointer">+1 min</button>
+                <button onclick="adjustTime(-60)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-2 rounded-lg text-xs cursor-pointer">-1 min</button>
             </div>
         </section>
 
@@ -100,13 +111,13 @@
                         <span class="text-xs text-slate-500">(Jugador infractor / anotador)</span>
                     </div>
                     <div class="grid grid-cols-4 gap-2">
-                        <button onclick="scoreWithPlayer('local', 1)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition">+1 PT</button>
-                        <button onclick="scoreWithPlayer('local', 2)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition">+2 PTS</button>
-                        <button onclick="scoreWithPlayer('local', 3)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition">+3 PTS</button>
-                        <button onclick="updateScore('local', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm">-1</button>
+                        <button onclick="scoreWithPlayer('local', 1)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition cursor-pointer">+1 PT</button>
+                        <button onclick="scoreWithPlayer('local', 2)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition cursor-pointer">+2 PTS</button>
+                        <button onclick="scoreWithPlayer('local', 3)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition cursor-pointer">+3 PTS</button>
+                        <button onclick="updateScore('local', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1</button>
                     </div>
                     <div class="flex items-center gap-2 pt-2">
-                        <button onclick="foulWithPlayer('local')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1">
+                        <button onclick="foulWithPlayer('local')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1 cursor-pointer">
                             + Registrar Falta a Jugador N°
                         </button>
                     </div>
@@ -153,13 +164,13 @@
                         <span class="text-xs text-slate-500">(Jugador infractor / anotador)</span>
                     </div>
                     <div class="grid grid-cols-4 gap-2">
-                        <button onclick="scoreWithPlayer('visitante', 1)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition">+1 PT</button>
-                        <button onclick="scoreWithPlayer('visitante', 2)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition">+2 PTS</button>
-                        <button onclick="scoreWithPlayer('visitante', 3)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition">+3 PTS</button>
-                        <button onclick="updateScore('visitante', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm">-1</button>
+                        <button onclick="scoreWithPlayer('visitante', 1)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition cursor-pointer">+1 PT</button>
+                        <button onclick="scoreWithPlayer('visitante', 2)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition cursor-pointer">+2 PTS</button>
+                        <button onclick="scoreWithPlayer('visitante', 3)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition cursor-pointer">+3 PTS</button>
+                        <button onclick="updateScore('visitante', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1</button>
                     </div>
                     <div class="flex items-center gap-2 pt-2">
-                        <button onclick="foulWithPlayer('visitante')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1">
+                        <button onclick="foulWithPlayer('visitante')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1 cursor-pointer">
                             + Registrar Falta a Jugador N°
                         </button>
                     </div>
@@ -194,18 +205,10 @@
             </div>
         </section>
 
-        <!-- CONTROLES GENERALES -->
-        <div id="general-controls" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-4">
-            <div class="flex items-center gap-2">
-                <span class="text-sm text-slate-400 font-semibold">Periodo:</span>
-                <button onclick="setPeriod('1Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">1Q</button>
-                <button onclick="setPeriod('2Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">2Q</button>
-                <button onclick="setPeriod('3Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">3Q</button>
-                <button onclick="setPeriod('4Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">4Q</button>
-                <button onclick="setPeriod('OT')" class="px-3 py-1.5 bg-rose-900/50 text-rose-300 rounded-lg text-xs font-bold">OT</button>
-            </div>
-            <button onclick="resetMatch()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-600/30 px-4 py-2 rounded-xl text-xs font-bold transition">
-                🔄 Reiniciar Partido
+        <!-- BOTÓN DE REINICIO GENERAL (Visible solo en control) -->
+        <div id="general-controls" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 flex justify-end">
+            <button onclick="resetMatch()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-600/30 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer">
+                🔄 Reiniciar Partido Completo
             </button>
         </div>
 
@@ -259,7 +262,6 @@
             } else {
                 btnHoriz.className = "px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer";
                 btnVert.className = "px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer";
-                // Fuerza 2 columnas de inmediato incluso en pantallas de celulares
                 teamsGrid.className = "grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6"; 
             }
         }
@@ -309,10 +311,13 @@
 
             const indicator = document.getElementById('view-indicator');
             const layoutControls = document.getElementById('public-layout-controls');
+            const periodSelectorControls = document.getElementById('period-selector-controls');
 
             if (mode === 'control') {
                 indicator.innerText = '⚙️ Modo Mesa de Control';
                 layoutControls.classList.add('hidden');
+                periodSelectorControls.classList.remove('flex'); // Muestra los botones de periodo arriba
+                periodSelectorControls.style.display = 'flex';
                 document.getElementById('controls-local').classList.remove('hidden');
                 document.getElementById('controls-visitante').classList.remove('hidden');
                 document.getElementById('cronometro-controls').classList.remove('hidden');
@@ -320,6 +325,7 @@
             } else {
                 indicator.innerText = '📺 Vista Pública / Espectador';
                 layoutControls.classList.remove('hidden');
+                periodSelectorControls.style.display = 'none'; // Oculta los botones de periodo en vista pública
             }
             listenToDatabase();
         }
@@ -331,6 +337,7 @@
             document.getElementById('controls-visitante').classList.add('hidden');
             document.getElementById('cronometro-controls').classList.add('hidden');
             document.getElementById('general-controls').classList.add('hidden');
+            document.getElementById('period-selector-controls').style.display = 'none';
         }
 
         function syncData() {
