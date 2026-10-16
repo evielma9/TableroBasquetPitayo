@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero de Básquetbol con Minuto de Juego Exacto</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;600;700&display=swap');
+        .font-digital { font-family: 'Orbitron', monospace; }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <!-- SELECCIÓN DE MODO -->
+    <div id="mode-selector" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
+            <h1 class="text-2xl font-bold mb-2 text-amber-400">🏀 Marcador con Minuto de Juego Exacto</h1>
+            <p class="text-slate-400 text-sm mb-6">Selecciona cómo deseas abrir esta pantalla:</p>
+            <div class="space-y-4">
+                <button onclick="selectMode('control')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-6 rounded-xl transition shadow-lg cursor-pointer">
+                    ⚙️ Mesa de Control (Anotador)
+                </button>
+                <button onclick="selectMode('public')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 px-6 rounded-xl transition border border-slate-700 cursor-pointer">
+                    📺 Vista Pública / Espectador
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div id="app-container" class="flex-1 flex flex-col max-w-7xl mx-auto w-full p-4 hidden">
+        
+        <!-- ENCABEZADO -->
+        <header class="flex justify-between items-center bg-slate-900/80 backdrop-blur border border-slate-800 px-6 py-3 rounded-2xl mb-4">
+            <div class="flex items-center space-x-3">
+                <span id="view-indicator" class="px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-full uppercase tracking-wider">Modo</span>
+                <span id="connection-status" class="text-xs text-slate-400 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span> Conectando...
+                </span>
+            </div>
+            <button onclick="changeModePrompt()" class="text-xs text-slate-400 hover:text-white underline cursor-pointer">Cambiar vista</button>
+        </header>
+
+        <!-- CRONÓMETRO Y CUARTOS -->
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-slate-400 text-sm uppercase font-semibold">Periodo:</span>
+                <span id="display-periodo" class="text-2xl font-bold font-digital text-amber-400">1Q</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="display-cronometro" class="text-4xl sm:text-5xl font-digital font-black tracking-widest text-white bg-slate-950 px-6 py-2 rounded-xl border border-slate-800">
+                    10:00
+                </div>
+            </div>
+            <div id="cronometro-controls" class="hidden flex items-center gap-2">
+                <button onclick="toggleTimer()" id="btn-timer" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition">Iniciar</button>
+                <button onclick="resetTimer()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-3 py-2 rounded-lg text-sm transition">Reiniciar</button>
+                <button onclick="adjustTime(60)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-2 rounded-lg text-xs">+1 min</button>
+                <button onclick="adjustTime(-60)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-2 rounded-lg text-xs">-1 min</button>
+            </div>
+        </section>
+
+        <!-- TABLERO PRINCIPAL DE EQUIPOS -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            
+            <!-- LOCAL -->
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                <div class="absolute top-0 left-0 right-0 h-2 bg-blue-600"></div>
+                <div>
+                    <div class="flex justify-between items-start mb-4">
+                        <input type="text" id="nombre-local" value="LOCAL" onchange="syncData()" class="text-2xl font-extrabold bg-transparent border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none text-blue-400 w-2/3" placeholder="Local">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-400 block uppercase font-semibold">Faltas Eq.</span>
+                            <span id="faltas-local" class="text-2xl font-bold font-digital text-rose-400">0</span>
+                        </div>
+                    </div>
+                    <div class="text-center my-4">
+                        <span id="puntos-local" class="text-7xl sm:text-9xl font-digital font-black text-white">0</span>
+                    </div>
+                </div>
+
+                <!-- Controles Mesa Local -->
+                <div id="controls-local" class="hidden space-y-3 pt-4 border-t border-slate-800">
+                    <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800">
+                        <span class="text-xs text-slate-400 font-semibold">N° Jugador:</span>
+                        <input type="number" id="input-jugador-local" placeholder="Ej. 23" class="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-center text-sm text-amber-400 font-bold focus:outline-none">
+                        <span class="text-xs text-slate-500">(Jugador infractor / anotador)</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="scoreWithPlayer('local', 1)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition">+1 PT</button>
+                        <button onclick="scoreWithPlayer('local', 2)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition">+2 PTS</button>
+                        <button onclick="scoreWithPlayer('local', 3)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition">+3 PTS</button>
+                        <button onclick="updateScore('local', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm">-1</button>
+                    </div>
+                    <div class="flex items-center gap-2 pt-2">
+                        <button onclick="foulWithPlayer('local')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1">
+                            + Registrar Falta a Jugador N°
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ESTADÍSTICAS INDIVIDUALES LOCAL -->
+                <div class="mt-4 pt-3 border-t border-slate-800/60 space-y-3">
+                    <div>
+                        <span class="text-xs text-blue-400 block mb-1 font-bold uppercase tracking-wider">🏀 Tabla de Anotadores:</span>
+                        <div id="lista-puntos-local" class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="text-slate-500 italic">Sin puntos</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-rose-400 block mb-1 font-bold uppercase tracking-wider">⚠️ Faltas por Jugador:</span>
+                        <div id="lista-faltas-local" class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="text-slate-500 italic">Sin faltas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISITANTE -->
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                <div class="absolute top-0 left-0 right-0 h-2 bg-amber-500"></div>
+                <div>
+                    <div class="flex justify-between items-start mb-4">
+                        <input type="text" id="nombre-visitante" value="VISITANTE" onchange="syncData()" class="text-2xl font-extrabold bg-transparent border-b border-transparent hover:border-slate-700 focus:border-amber-500 focus:outline-none text-amber-400 w-2/3" placeholder="Visitante">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-400 block uppercase font-semibold">Faltas Eq.</span>
+                            <span id="faltas-visitante" class="text-2xl font-bold font-digital text-rose-400">0</span>
+                        </div>
+                    </div>
+                    <div class="text-center my-4">
+                        <span id="puntos-visitante" class="text-7xl sm:text-9xl font-digital font-black text-white">0</span>
+                    </div>
+                </div>
+
+                <!-- Controles Mesa Visitante -->
+                <div id="controls-visitante" class="hidden space-y-3 pt-4 border-t border-slate-800">
+                    <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800">
+                        <span class="text-xs text-slate-400 font-semibold">N° Jugador:</span>
+                        <input type="number" id="input-jugador-visitante" placeholder="Ej. 10" class="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-center text-sm text-amber-400 font-bold focus:outline-none">
+                        <span class="text-xs text-slate-500">(Jugador infractor / anotador)</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="scoreWithPlayer('visitante', 1)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition">+1 PT</button>
+                        <button onclick="scoreWithPlayer('visitante', 2)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition">+2 PTS</button>
+                        <button onclick="scoreWithPlayer('visitante', 3)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition">+3 PTS</button>
+                        <button onclick="updateScore('visitante', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm">-1</button>
+                    </div>
+                    <div class="flex items-center gap-2 pt-2">
+                        <button onclick="foulWithPlayer('visitante')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1">
+                            + Registrar Falta a Jugador N°
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ESTADÍSTICAS INDIVIDUALES VISITANTE -->
+                <div class="mt-4 pt-3 border-t border-slate-800/60 space-y-3">
+                    <div>
+                        <span class="text-xs text-amber-400 block mb-1 font-bold uppercase tracking-wider">🏀 Tabla de Anotadores:</span>
+                        <div id="lista-puntos-visitante" class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="text-slate-500 italic">Sin puntos</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-rose-400 block mb-1 font-bold uppercase tracking-wider">⚠️ Faltas por Jugador:</span>
+                        <div id="lista-faltas-visitante" class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="text-slate-500 italic">Sin faltas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- BITÁCORA DEL PARTIDO EN VIVO -->
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl">
+            <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                📜 Bitácora del Partido (Con Minuto de Juego Exacto)
+            </h3>
+            <div id="bitacora-container" class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 max-h-56 overflow-y-auto space-y-2 text-xs font-mono">
+                <span class="text-slate-500 italic">No hay registros de jugadas aún...</span>
+            </div>
+        </section>
+
+        <!-- CONTROLES GENERALES -->
+        <div id="general-controls" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-slate-400 font-semibold">Periodo:</span>
+                <button onclick="setPeriod('1Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">1Q</button>
+                <button onclick="setPeriod('2Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">2Q</button>
+                <button onclick="setPeriod('3Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">3Q</button>
+                <button onclick="setPeriod('4Q')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold">4Q</button>
+                <button onclick="setPeriod('OT')" class="px-3 py-1.5 bg-rose-900/50 text-rose-300 rounded-lg text-xs font-bold">OT</button>
+            </div>
+            <button onclick="resetMatch()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-600/30 px-4 py-2 rounded-xl text-xs font-bold transition">
+                🔄 Reiniciar Partido
+            </button>
+        </div>
+
+    </div>
+
+    <!-- SCRIPT DE LÓGICA Y CREDENCIALES DE FIREBASE -->
+    <script>
+        // Configuración conectada a tu proyecto de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyC5asyoMQyxqkhKUNZq3gmwLfe65HCBLE",
+            authDomain: "marcador-basquetbol.firebaseapp.com",
+            databaseURL: "https://marcador-basquetbol-default-rtdb.firebaseio.com",
+            projectId: "marcador-basquetbol",
+            storageBucket: "marcador-basquetbol.firebasestorage.app",
+            messagingSenderId: "282633665969",
+            appId: "1:282633665969:web:4f05b5fb6e9ec3c7c81190",
+            measurementId: "G-CK06SNHNJL"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const matchRef = db.ref('partidoActual');
+
+        let currentMode = '';
+
+        let gameState = {
+            localScore: 0,
+            visitanteScore: 0,
+            localFouls: 0,
+            visitanteFouls: 0,
+            localName: 'LOCAL',
+            visitanteName: 'VISITANTE',
+            period: '1Q',
+            timeLeft: 600,
+            isTimerRunning: false,
+            playerPoints: { local: {}, visitante: {} },
+            playerFouls: { local: {}, visitante: {} },
+            logs: []
+        };
+
+        // CÁLCULO DEL MINUTO EXACTO DE JUEGO (Transcurrido)
+        function getGameMinuteFormatted() {
+            const totalQuarterSeconds = 600; // 10 min por cuarto
+            const elapsedSecondsQuarter = Math.max(0, totalQuarterSeconds - gameState.timeLeft);
+            
+            const elapsedMinInQuarter = Math.floor(elapsedSecondsQuarter / 60);
+            const elapsedSecInMin = elapsedSecondsQuarter % 60;
+            
+            let quarterOffset = 0;
+            if (gameState.period === '2Q') quarterOffset = 10;
+            if (gameState.period === '3Q') quarterOffset = 20;
+            if (gameState.period === '4Q') quarterOffset = 30;
+            if (gameState.period === 'OT') quarterOffset = 40;
+
+            const totalGameSeconds = (quarterOffset * 60) + elapsedSecondsQuarter;
+            const totalGameMinutes = Math.floor(totalGameSeconds / 60) + 1;
+
+            const formatSec = String(elapsedSecInMin).padStart(2, '0');
+            return `Min ${totalGameMinutes}' [${gameState.period} - ${String(elapsedMinInQuarter).padStart(2, '0')}:${formatSec}]`;
+        }
+
+        function getRealTimeFormatted() {
+            const now = new Date();
+            return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function addLogEntry(description, team) {
+            if (!gameState.logs) gameState.logs = [];
+            
+            const logItem = {
+                text: description,
+                timeLabel: getGameMinuteFormatted(),
+                realTime: getRealTimeFormatted(),
+                team: team
+            };
+
+            gameState.logs.unshift(logItem);
+        }
+
+        function selectMode(mode) {
+            currentMode = mode;
+            document.getElementById('mode-selector').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+
+            const indicator = document.getElementById('view-indicator');
+            if (mode === 'control') {
+                indicator.innerText = '⚙️ Modo Mesa de Control';
+                document.getElementById('controls-local').classList.remove('hidden');
+                document.getElementById('controls-visitante').classList.remove('hidden');
+                document.getElementById('cronometro-controls').classList.remove('hidden');
+                document.getElementById('general-controls').classList.remove('hidden');
+            } else {
+                indicator.innerText = '📺 Vista Pública / Espectador';
+            }
+            listenToDatabase();
+        }
+
+        function changeModePrompt() {
+            document.getElementById('mode-selector').classList.remove('hidden');
+            document.getElementById('app-container').classList.add('hidden');
+            document.getElementById('controls-local').classList.add('hidden');
+            document.getElementById('controls-visitante').classList.add('hidden');
+            document.getElementById('cronometro-controls').classList.add('hidden');
+            document.getElementById('general-controls').classList.add('hidden');
+        }
+
+        function syncData() {
+            if (currentMode !== 'control') return;
+            gameState.localName = document.getElementById('nombre-local').value;
+            gameState.visitanteName = document.getElementById('nombre-visitante').value;
+            matchRef.set(gameState);
+        }
+
+        function scoreWithPlayer(team, points) {
+            if (currentMode !== 'control') return;
+            const playerInput = document.getElementById(`input-jugador-${team}`);
+            const playerNum = playerInput.value.trim();
+
+            if (team === 'local') gameState.localScore = Math.max(0, gameState.localScore + points);
+            else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
+
+            if (playerNum) {
+                if (!gameState.playerPoints) gameState.playerPoints = { local: {}, visitante: {} };
+                if (!gameState.playerPoints[team]) gameState.playerPoints[team] = {};
+                gameState.playerPoints[team][playerNum] = (gameState.playerPoints[team][playerNum] || 0) + points;
+            }
+
+            const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
+            const playerDesc = playerNum ? `Jugador #${playerNum}` : `Equipo`;
+            addLogEntry(`🏀 ${playerDesc} (${teamName}) anotó ${points} pt(s).`, team);
+
+            syncData();
+        }
+
+        function updateScore(team, points) {
+            if (currentMode !== 'control') return;
+            if (team === 'local') gameState.localScore = Math.max(0, gameState.localScore + points);
+            else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
+
+            const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
+            addLogEntry(`Ajuste de puntos (${teamName}): ${points > 0 ? '+' : ''}${points} pt(s).`, team);
+
+            syncData();
+        }
+
+        function foulWithPlayer(team) {
+            if (currentMode !== 'control') return;
+            const playerInput = document.getElementById(`input-jugador-${team}`);
+            const playerNum = playerInput.value.trim();
+
+            if (!playerNum) {
+                alert("Por favor pon el número del jugador en el campo 'N° Jugador'.");
+                return;
+            }
+
+            if (team === 'local') gameState.localFouls++;
+            else gameState.visitanteFouls++;
+
+            if (!gameState.playerFouls) gameState.playerFouls = { local: {}, visitante: {} };
+            if (!gameState.playerFouls[team]) gameState.playerFouls[team] = {};
+            gameState.playerFouls[team][playerNum] = (gameState.playerFouls[team][playerNum] || 0) + 1;
+
+            const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
+            const currentFouls = gameState.playerFouls[team][playerNum];
+            addLogEntry(`⚠️ Falta cometida por Jugador #${playerNum} (${teamName}) [Acumula ${currentFouls} FLT].`, team);
+
+            syncData();
+        }
+
+        function setPeriod(period) {
+            if (currentMode !== 'control') return;
+            gameState.period = period;
+            addLogEntry(`⏱️ Cambio de periodo a ${period}.`, 'system');
+            syncData();
+        }
+
+        function toggleTimer() {
+            if (currentMode !== 'control') return;
+            gameState.isTimerRunning = !gameState.isTimerRunning;
+            syncData();
+        }
+
+        function resetTimer() {
+            if (currentMode !== 'control') return;
+            gameState.timeLeft = 600;
+            gameState.isTimerRunning = false;
+            syncData();
+        }
+
+        function adjustTime(seconds) {
+            if (currentMode !== 'control') return;
+            gameState.timeLeft = Math.max(0, gameState.timeLeft + seconds);
+            syncData();
+        }
+
+        function resetMatch() {
+            if (currentMode !== 'control') return;
+            if (confirm("¿Reiniciar todo el partido y la bitácora?")) {
+                gameState = {
+                    localScore: 0,
+                    visitanteScore: 0,
+                    localFouls: 0,
+                    visitanteFouls: 0,
+                    localName: 'LOCAL',
+                    visitanteName: 'VISITANTE',
+                    period: '1Q',
+                    timeLeft: 600,
+                    isTimerRunning: false,
+                    playerPoints: { local: {}, visitante: {} },
+                    playerFouls: { local: {}, visitante: {} },
+                    logs: []
+                };
+                syncData();
+            }
+        }
+
+        function listenToDatabase() {
+            const statusEl = document.getElementById('connection-status');
+            matchRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Conectado en vivo`;
+                if (data) {
+                    gameState = data;
+                    updateUI();
+                } else if (currentMode === 'control') {
+                    syncData();
+                }
+            });
+        }
+
+        function updateUI() {
+            document.getElementById('puntos-local').innerText = gameState.localScore;
+            document.getElementById('puntos-visitante').innerText = gameState.visitanteScore;
+            document.getElementById('faltas-local').innerText = gameState.localFouls;
+            document.getElementById('faltas-visitante').innerText = gameState.visitanteFouls;
+            document.getElementById('display-periodo').innerText = gameState.period;
+
+            if (currentMode !== 'control' || document.activeElement !== document.getElementById('nombre-local')) {
+                document.getElementById('nombre-local').value = gameState.localName;
+            }
+            if (currentMode !== 'control' || document.activeElement !== document.getElementById('nombre-visitante')) {
+                document.getElementById('nombre-visitante').value = gameState.visitanteName;
+            }
+
+            const minutes = Math.floor(gameState.timeLeft / 60);
+            const seconds = gameState.timeLeft % 60;
+            document.getElementById('display-cronometro').innerText = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+            renderPlayerPoints('local', gameState.playerPoints?.local || {});
+            renderPlayerPoints('visitante', gameState.playerPoints?.visitante || {});
+            renderPlayerFouls('local', gameState.playerFouls?.local || {});
+            renderPlayerFouls('visitante', gameState.playerFouls?.visitante || {});
+            renderLogs(gameState.logs || []);
+
+            const btnTimer = document.getElementById('btn-timer');
+            if (btnTimer) {
+                btnTimer.innerText = gameState.isTimerRunning ? "Pausar" : "Iniciar";
+                btnTimer.className = gameState.isTimerRunning ? "bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition" : "bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition";
+            }
+        }
+
+        function renderPlayerPoints(team, pointsObj) {
+            const container = document.getElementById(`lista-puntos-${team}`);
+            const entries = Object.entries(pointsObj).sort((a, b) => b[1] - a[1]);
+
+            if (entries.length === 0) {
+                container.innerHTML = `<span class="text-slate-500 italic">Sin puntos</span>`;
+                return;
+            }
+
+            container.innerHTML = entries.map(([num, pts]) => `
+                <span class="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-slate-200 font-mono">
+                    #${num}: <b class="text-amber-400 font-bold">${pts} pts</b>
+                </span>
+            `).join('');
+        }
+
+        function renderPlayerFouls(team, foulsObj) {
+            const container = document.getElementById(`lista-faltas-${team}`);
+            const entries = Object.entries(foulsObj);
+
+            if (entries.length === 0) {
+                container.innerHTML = `<span class="text-slate-500 italic">Sin faltas</span>`;
+                return;
+            }
+
+            container.innerHTML = entries.map(([num, count]) => {
+                const isOut = count >= 5;
+                const badgeColor = isOut ? 'bg-rose-600 text-white font-bold animate-pulse' : 'bg-slate-800/80 text-rose-300 border border-rose-900/50';
+                return `
+                    <span class="px-2.5 py-1 rounded-md text-xs font-mono ${badgeColor}">
+                        #${num}: <b>${count} FLT</b> ${isOut ? '(EXPULSADO)' : ''}
+                    </span>
+                `;
+            }).join('');
+        }
+
+        function renderLogs(logsArray) {
+            const container = document.getElementById('bitacora-container');
+            if (!logsArray || logsArray.length === 0) {
+                container.innerHTML = `<span class="text-slate-500 italic">No hay registros de jugadas aún...</span>`;
+                return;
+            }
+
+            container.innerHTML = logsArray.map(log => {
+                let colorClass = 'text-slate-300';
+                if (log.team === 'local') colorClass = 'text-blue-400';
+                if (log.team === 'visitante') colorClass = 'text-amber-400';
+
+                return `
+                    <div class="flex items-center justify-between border-b border-slate-800/50 pb-1">
+                        <span class="${colorClass}">${log.text}</span>
+                        <span class="text-slate-500 text-[10px] ml-2 font-semibold">
+                            [${log.timeLabel}] (${log.realTime})
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        setInterval(() => {
+            if (currentMode === 'control' && gameState.isTimerRunning && gameState.timeLeft > 0) {
+                gameState.timeLeft--;
+                matchRef.update({ timeLeft: gameState.timeLeft });
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
