@@ -73,8 +73,8 @@
             </div>
         </section>
 
-        <!-- TABLERO PRINCIPAL DE EQUIPOS (Su estructura cambia dinámicamente según la vista pública elegida) -->
-        <div id="teams-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- TABLERO PRINCIPAL DE EQUIPOS -->
+        <div id="teams-grid" class="grid grid-cols-1 gap-6 mb-6">
             
             <!-- LOCAL -->
             <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
@@ -229,7 +229,7 @@
         const matchRef = db.ref('partidoActual');
 
         let currentMode = '';
-        let publicLayoutMode = 'vertical'; // 'vertical' u 'horizontal'
+        let publicLayoutMode = 'vertical';
 
         let gameState = {
             localScore: 0,
@@ -255,17 +255,17 @@
             if (layout === 'vertical') {
                 btnVert.className = "px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer";
                 btnHoriz.className = "px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer";
-                teamsGrid.className = "grid grid-cols-1 gap-6 mb-6"; // Una columna encima de otra
+                teamsGrid.className = "grid grid-cols-1 gap-6 mb-6"; 
             } else {
                 btnHoriz.className = "px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer";
                 btnVert.className = "px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer";
-                teamsGrid.className = "grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"; // Lado a lado estilo pantalla horizontal
+                // Fuerza 2 columnas de inmediato incluso en pantallas de celulares
+                teamsGrid.className = "grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6"; 
             }
         }
 
-        // CÁLCULO DEL MINUTO EXACTO DE JUEGO (Transcurrido)
         function getGameMinuteFormatted() {
-            const totalQuarterSeconds = 600; // 10 min por cuarto
+            const totalQuarterSeconds = 600; 
             const elapsedSecondsQuarter = Math.max(0, totalQuarterSeconds - gameState.timeLeft);
             
             const elapsedMinInQuarter = Math.floor(elapsedSecondsQuarter / 60);
@@ -312,14 +312,14 @@
 
             if (mode === 'control') {
                 indicator.innerText = '⚙️ Modo Mesa de Control';
-                layoutControls.classList.add('hidden'); // Ocultar controles de diseño en la mesa de control
+                layoutControls.classList.add('hidden');
                 document.getElementById('controls-local').classList.remove('hidden');
                 document.getElementById('controls-visitante').classList.remove('hidden');
                 document.getElementById('cronometro-controls').classList.remove('hidden');
                 document.getElementById('general-controls').classList.remove('hidden');
             } else {
                 indicator.innerText = '📺 Vista Pública / Espectador';
-                layoutControls.classList.remove('hidden'); // Mostrar selector vertical/horizontal en vista pública
+                layoutControls.classList.remove('hidden');
             }
             listenToDatabase();
         }
