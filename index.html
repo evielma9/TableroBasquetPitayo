@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Registro de Equipos</title>
+    <title>Tablero de Básquetbol con Validación de Jugadores</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -37,9 +37,9 @@
     <div id="setup-modal" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
         <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <h2 class="text-xl font-bold text-amber-400 mb-1 flex items-center gap-2">
-                📋 Registro de Equipos y Jugadores
+                📋 Registro de Equipos y Planteles
             </h2>
-            <p class="text-slate-400 text-xs mb-6">Configura los nombres de los equipos y la lista de jugadores para el partido.</p>
+            <p class="text-slate-400 text-xs mb-6">Configura los nombres de los equipos y la lista de jugadores. Solo los números registrados podrán sumar puntos o recibir faltas.</p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <!-- CONFIG LOCAL -->
@@ -83,7 +83,7 @@
             </div>
             
             <div class="flex items-center gap-3">
-                <!-- Botón para abrir modal de registro (solo visible en Mesa de Control) -->
+                <!-- Botón para abrir modal de registro -->
                 <button id="btn-open-setup" onclick="openSetupModal()" class="hidden bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-blue-300 px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer">
                     📋 Configurar Equipos y Planteles
                 </button>
@@ -105,7 +105,7 @@
                 <span id="display-periodo" class="text-2xl font-bold font-digital text-amber-400">1Q</span>
             </div>
 
-            <!-- Botones de Cambio de Periodo (Visibles solo en Mesa de Control) -->
+            <!-- Botones de Cambio de Periodo -->
             <div id="period-selector-controls" class="hidden items-center gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
                 <button onclick="setPeriod('1Q')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 transition cursor-pointer">1Q</button>
                 <button onclick="setPeriod('2Q')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 transition cursor-pointer">2Q</button>
@@ -136,7 +136,7 @@
                 <div class="absolute top-0 left-0 right-0 h-2 bg-blue-600"></div>
                 <div>
                     <div class="flex justify-between items-start mb-4">
-                        <input type="text" id="nombre-local" value="LOCAL" onchange="syncData()" class="text-2xl font-extrabold bg-transparent border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none text-blue-400 w-2/3" placeholder="Local">
+                        <input type="text" id="nombre-local" value="LOCAL" oninput="syncData()" class="text-2xl font-extrabold bg-transparent border-b border-slate-700 focus:border-blue-500 focus:outline-none text-blue-400 w-2/3 uppercase" placeholder="LOCAL">
                         <div class="text-right">
                             <span class="text-xs text-slate-400 block uppercase font-semibold">Faltas Eq.</span>
                             <span id="faltas-local" class="text-2xl font-bold font-digital text-rose-400">0</span>
@@ -195,7 +195,7 @@
                 <div class="absolute top-0 left-0 right-0 h-2 bg-amber-500"></div>
                 <div>
                     <div class="flex justify-between items-start mb-4">
-                        <input type="text" id="nombre-visitante" value="VISITANTE" onchange="syncData()" class="text-2xl font-extrabold bg-transparent border-b border-transparent hover:border-slate-700 focus:border-amber-500 focus:outline-none text-amber-400 w-2/3" placeholder="Visitante">
+                        <input type="text" id="nombre-visitante" value="VISITANTE" oninput="syncData()" class="text-2xl font-extrabold bg-transparent border-b border-slate-700 focus:border-amber-500 focus:outline-none text-amber-400 w-2/3 uppercase" placeholder="VISITANTE">
                         <div class="text-right">
                             <span class="text-xs text-slate-400 block uppercase font-semibold">Faltas Eq.</span>
                             <span id="faltas-visitante" class="text-2xl font-bold font-digital text-rose-400">0</span>
@@ -328,7 +328,7 @@
             }
         }
 
-        // FUNCIONES DE MODAL DE CONFIGURACIÓN
+        // MODAL CONFIGURACIÓN
         function openSetupModal() {
             document.getElementById('modal-name-local').value = gameState.localName || 'LOCAL';
             document.getElementById('modal-name-visitante').value = gameState.visitanteName || 'VISITANTE';
@@ -351,6 +351,25 @@
 
             syncData();
             closeSetupModal();
+        }
+
+        // OBTENER NÚMEROS REGISTRADOS DE LA PLANTILLA
+        function getRegisteredPlayerNumbers(team) {
+            const text = gameState.rosterText?.[team] || '';
+            if (!text.trim()) return null; // Si no hay lista cargada, se permite cualquier número
+
+            const lines = text.split('\n');
+            const numbers = new Set();
+
+            lines.forEach(line => {
+                // Busca el primer número al inicio o antes de un guion/espacio
+                const match = line.match(/^\s*#?(\d+)/);
+                if (match) {
+                    numbers.add(match[1]);
+                }
+            });
+
+            return numbers.size > 0 ? numbers : null;
         }
 
         function getGameMinuteFormatted() {
@@ -437,8 +456,8 @@
 
         function syncData() {
             if (currentMode !== 'control') return;
-            gameState.localName = document.getElementById('nombre-local').value;
-            gameState.visitanteName = document.getElementById('nombre-visitante').value;
+            gameState.localName = document.getElementById('nombre-local').value.toUpperCase();
+            gameState.visitanteName = document.getElementById('nombre-visitante').value.toUpperCase();
             matchRef.set(gameState);
         }
 
@@ -446,6 +465,16 @@
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
             const playerNum = playerInput.value.trim();
+
+            // Validación de jugador contra la plantilla registrada
+            if (playerNum) {
+                const validNumbers = getRegisteredPlayerNumbers(team);
+                if (validNumbers && !validNumbers.has(playerNum)) {
+                    const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
+                    alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla de ${teamName}. Por favor verifica el número o regístralo en 'Configurar Equipos y Planteles'.`);
+                    return;
+                }
+            }
 
             if (team === 'local') gameState.localScore = Math.max(0, gameState.localScore + points);
             else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
@@ -481,6 +510,14 @@
 
             if (!playerNum) {
                 alert("Por favor pon el número del jugador en el campo 'N° Jugador'.");
+                return;
+            }
+
+            // Validación de jugador contra la plantilla registrada
+            const validNumbers = getRegisteredPlayerNumbers(team);
+            if (validNumbers && !validNumbers.has(playerNum)) {
+                const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
+                alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla de ${teamName}. Por favor verifica el número o regístralo en 'Configurar Equipos y Planteles'.`);
                 return;
             }
 
@@ -567,11 +604,12 @@
             document.getElementById('faltas-visitante').innerText = gameState.visitanteFouls;
             document.getElementById('display-periodo').innerText = gameState.period;
 
+            // Actualización instantánea de nombres sin importar qué elemento esté activo
             if (currentMode !== 'control' || document.activeElement !== document.getElementById('nombre-local')) {
-                document.getElementById('nombre-local').value = gameState.localName;
+                document.getElementById('nombre-local').value = gameState.localName || 'LOCAL';
             }
             if (currentMode !== 'control' || document.activeElement !== document.getElementById('nombre-visitante')) {
-                document.getElementById('nombre-visitante').value = gameState.visitanteName;
+                document.getElementById('nombre-visitante').value = gameState.visitanteName || 'VISITANTE';
             }
 
             const minutes = Math.floor(gameState.timeLeft / 60);
