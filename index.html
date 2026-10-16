@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Minuto de Juego Exacto</title>
+    <title>Tablero de Básquetbol con Vistas Adaptables</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -20,7 +20,7 @@
     <!-- SELECCIÓN DE MODO -->
     <div id="mode-selector" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
-            <h1 class="text-2xl font-bold mb-2 text-amber-400">🏀 Marcador con Minuto de Juego Exacto</h1>
+            <h1 class="text-2xl font-bold mb-2 text-amber-400">🏀 Marcador con Vistas Adaptables</h1>
             <p class="text-slate-400 text-sm mb-6">Selecciona cómo deseas abrir esta pantalla:</p>
             <div class="space-y-4">
                 <button onclick="selectMode('control')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-6 rounded-xl transition shadow-lg cursor-pointer">
@@ -44,6 +44,13 @@
                     <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span> Conectando...
                 </span>
             </div>
+            
+            <!-- Selector de Orientación para Vista Pública -->
+            <div id="public-layout-controls" class="hidden items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-xl">
+                <button onclick="setPublicLayout('vertical')" id="btn-layout-vertical" class="px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer">📱 Vertical</button>
+                <button onclick="setPublicLayout('horizontal')" id="btn-layout-horizontal" class="px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">💻 Horizontal</button>
+            </div>
+
             <button onclick="changeModePrompt()" class="text-xs text-slate-400 hover:text-white underline cursor-pointer">Cambiar vista</button>
         </header>
 
@@ -66,8 +73,8 @@
             </div>
         </section>
 
-        <!-- TABLERO PRINCIPAL DE EQUIPOS -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- TABLERO PRINCIPAL DE EQUIPOS (Su estructura cambia dinámicamente según la vista pública elegida) -->
+        <div id="teams-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             
             <!-- LOCAL -->
             <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
@@ -206,7 +213,6 @@
 
     <!-- SCRIPT DE LÓGICA Y CREDENCIALES DE FIREBASE -->
     <script>
-        // Configuración conectada a tu proyecto de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyC5asyoMQyxqkhKUNZq3gmwLfe65HCBLE",
             authDomain: "marcador-basquetbol.firebaseapp.com",
@@ -223,6 +229,7 @@
         const matchRef = db.ref('partidoActual');
 
         let currentMode = '';
+        let publicLayoutMode = 'vertical'; // 'vertical' u 'horizontal'
 
         let gameState = {
             localScore: 0,
@@ -238,6 +245,23 @@
             playerFouls: { local: {}, visitante: {} },
             logs: []
         };
+
+        function setPublicLayout(layout) {
+            publicLayoutMode = layout;
+            const btnVert = document.getElementById('btn-layout-vertical');
+            const btnHoriz = document.getElementById('btn-layout-horizontal');
+            const teamsGrid = document.getElementById('teams-grid');
+
+            if (layout === 'vertical') {
+                btnVert.className = "px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer";
+                btnHoriz.className = "px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer";
+                teamsGrid.className = "grid grid-cols-1 gap-6 mb-6"; // Una columna encima de otra
+            } else {
+                btnHoriz.className = "px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer";
+                btnVert.className = "px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer";
+                teamsGrid.className = "grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"; // Lado a lado estilo pantalla horizontal
+            }
+        }
 
         // CÁLCULO DEL MINUTO EXACTO DE JUEGO (Transcurrido)
         function getGameMinuteFormatted() {
@@ -284,14 +308,18 @@
             document.getElementById('app-container').classList.remove('hidden');
 
             const indicator = document.getElementById('view-indicator');
+            const layoutControls = document.getElementById('public-layout-controls');
+
             if (mode === 'control') {
                 indicator.innerText = '⚙️ Modo Mesa de Control';
+                layoutControls.classList.add('hidden'); // Ocultar controles de diseño en la mesa de control
                 document.getElementById('controls-local').classList.remove('hidden');
                 document.getElementById('controls-visitante').classList.remove('hidden');
                 document.getElementById('cronometro-controls').classList.remove('hidden');
                 document.getElementById('general-controls').classList.remove('hidden');
             } else {
                 indicator.innerText = '📺 Vista Pública / Espectador';
+                layoutControls.classList.remove('hidden'); // Mostrar selector vertical/horizontal en vista pública
             }
             listenToDatabase();
         }
