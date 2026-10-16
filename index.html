@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol - Mesa Lado a Lado</title>
+    <title>Tablero de Básquetbol con Registro de Equipos</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -33,6 +33,43 @@
         </div>
     </div>
 
+    <!-- MODAL DE CONFIGURACIÓN INICIAL DE EQUIPOS Y JUGADORES -->
+    <div id="setup-modal" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-amber-400 mb-1 flex items-center gap-2">
+                📋 Registro de Equipos y Jugadores
+            </h2>
+            <p class="text-slate-400 text-xs mb-6">Configura los nombres de los equipos y la lista de jugadores para el partido.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- CONFIG LOCAL -->
+                <div class="bg-slate-950 p-4 rounded-2xl border border-blue-900/40">
+                    <h3 class="text-sm font-bold text-blue-400 uppercase mb-3">Equipo Local</h3>
+                    <label class="block text-xs text-slate-400 mb-1">Nombre del Equipo:</label>
+                    <input type="text" id="modal-name-local" placeholder="Ej. Lakers" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold mb-4 focus:outline-none focus:border-blue-500">
+                    
+                    <label class="block text-xs text-slate-400 mb-1">Plantilla de Jugadores (N° - Nombre):</label>
+                    <textarea id="modal-roster-local" placeholder="23 - Carlos López&#10;10 - Juan Pérez&#10;7 - Pedro Sánchez" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 h-36 font-mono focus:outline-none focus:border-blue-500"></textarea>
+                </div>
+
+                <!-- CONFIG VISITANTE -->
+                <div class="bg-slate-950 p-4 rounded-2xl border border-amber-900/40">
+                    <h3 class="text-sm font-bold text-amber-400 uppercase mb-3">Equipo Visitante</h3>
+                    <label class="block text-xs text-slate-400 mb-1">Nombre del Equipo:</label>
+                    <input type="text" id="modal-name-visitante" placeholder="Ej. Celtics" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold mb-4 focus:outline-none focus:border-amber-500">
+                    
+                    <label class="block text-xs text-slate-400 mb-1">Plantilla de Jugadores (N° - Nombre):</label>
+                    <textarea id="modal-roster-visitante" placeholder="11 - Kyrie Irving&#10;0 - Jayson Tatum&#10;36 - Marcus Smart" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 h-36 font-mono focus:outline-none focus:border-amber-500"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                <button onclick="closeSetupModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer">Cancelar</button>
+                <button onclick="saveSetupModal()" class="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold transition cursor-pointer shadow-lg">Guardar y Aplicar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- CONTENEDOR PRINCIPAL -->
     <div id="app-container" class="flex-1 flex flex-col max-w-7xl mx-auto w-full p-4 hidden">
         
@@ -45,13 +82,20 @@
                 </span>
             </div>
             
-            <!-- Selector de Orientación para Vista Pública -->
-            <div id="public-layout-controls" class="hidden items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-xl">
-                <button onclick="setPublicLayout('vertical')" id="btn-layout-vertical" class="px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer">📱 Vertical</button>
-                <button onclick="setPublicLayout('horizontal')" id="btn-layout-horizontal" class="px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">💻 Horizontal</button>
-            </div>
+            <div class="flex items-center gap-3">
+                <!-- Botón para abrir modal de registro (solo visible en Mesa de Control) -->
+                <button id="btn-open-setup" onclick="openSetupModal()" class="hidden bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-blue-300 px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer">
+                    📋 Configurar Equipos y Planteles
+                </button>
 
-            <button onclick="changeModePrompt()" class="text-xs text-slate-400 hover:text-white underline cursor-pointer">Cambiar vista</button>
+                <!-- Selector de Orientación para Vista Pública -->
+                <div id="public-layout-controls" class="hidden items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-xl">
+                    <button onclick="setPublicLayout('vertical')" id="btn-layout-vertical" class="px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition cursor-pointer">📱 Vertical</button>
+                    <button onclick="setPublicLayout('horizontal')" id="btn-layout-horizontal" class="px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">💻 Horizontal</button>
+                </div>
+
+                <button onclick="changeModePrompt()" class="text-xs text-slate-400 hover:text-white underline cursor-pointer">Cambiar vista</button>
+            </div>
         </header>
 
         <!-- CRONÓMETRO, PERIODO Y CONTROLES DE TIEMPO -->
@@ -123,7 +167,7 @@
                     </div>
                 </div>
 
-                <!-- ESTADÍSTICAS INDIVIDUALES LOCAL -->
+                <!-- ESTADÍSTICAS INDIVIDUALES Y PLANTEL LOCAL -->
                 <div class="mt-4 pt-3 border-t border-slate-800/60 space-y-3">
                     <div>
                         <span class="text-xs text-blue-400 block mb-1 font-bold uppercase tracking-wider">🏀 Tabla de Anotadores:</span>
@@ -135,6 +179,12 @@
                         <span class="text-xs text-rose-400 block mb-1 font-bold uppercase tracking-wider">⚠️ Faltas por Jugador:</span>
                         <div id="lista-faltas-local" class="flex flex-wrap gap-1.5 text-xs">
                             <span class="text-slate-500 italic">Sin faltas</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-1 font-bold uppercase tracking-wider">📋 Plantel de Jugadores:</span>
+                        <div id="roster-display-local" class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="text-slate-500 italic">Sin plantilla registrada</span>
                         </div>
                     </div>
                 </div>
@@ -176,7 +226,7 @@
                     </div>
                 </div>
 
-                <!-- ESTADÍSTICAS INDIVIDUALES VISITANTE -->
+                <!-- ESTADÍSTICAS INDIVIDUALES Y PLANTEL VISITANTE -->
                 <div class="mt-4 pt-3 border-t border-slate-800/60 space-y-3">
                     <div>
                         <span class="text-xs text-amber-400 block mb-1 font-bold uppercase tracking-wider">🏀 Tabla de Anotadores:</span>
@@ -188,6 +238,12 @@
                         <span class="text-xs text-rose-400 block mb-1 font-bold uppercase tracking-wider">⚠️ Faltas por Jugador:</span>
                         <div id="lista-faltas-visitante" class="flex flex-wrap gap-1.5 text-xs">
                             <span class="text-slate-500 italic">Sin faltas</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-1 font-bold uppercase tracking-wider">📋 Plantel de Jugadores:</span>
+                        <div id="roster-display-visitante" class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="text-slate-500 italic">Sin plantilla registrada</span>
                         </div>
                     </div>
                 </div>
@@ -246,6 +302,7 @@
             isTimerRunning: false,
             playerPoints: { local: {}, visitante: {} },
             playerFouls: { local: {}, visitante: {} },
+            rosterText: { local: '', visitante: '' },
             logs: []
         };
 
@@ -256,7 +313,6 @@
             const teamsGrid = document.getElementById('teams-grid');
 
             if (currentMode === 'control') {
-                // En Mesa de Control SIEMPRE forzar 2 columnas
                 teamsGrid.className = "grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6";
                 return;
             }
@@ -270,6 +326,31 @@
                 btnVert.className = "px-3 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer";
                 teamsGrid.className = "grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6"; 
             }
+        }
+
+        // FUNCIONES DE MODAL DE CONFIGURACIÓN
+        function openSetupModal() {
+            document.getElementById('modal-name-local').value = gameState.localName || 'LOCAL';
+            document.getElementById('modal-name-visitante').value = gameState.visitanteName || 'VISITANTE';
+            document.getElementById('modal-roster-local').value = gameState.rosterText?.local || '';
+            document.getElementById('modal-roster-visitante').value = gameState.rosterText?.visitante || '';
+            document.getElementById('setup-modal').classList.remove('hidden');
+        }
+
+        function closeSetupModal() {
+            document.getElementById('setup-modal').classList.add('hidden');
+        }
+
+        function saveSetupModal() {
+            gameState.localName = document.getElementById('modal-name-local').value.trim() || 'LOCAL';
+            gameState.visitanteName = document.getElementById('modal-name-visitante').value.trim() || 'VISITANTE';
+            
+            if (!gameState.rosterText) gameState.rosterText = {};
+            gameState.rosterText.local = document.getElementById('modal-roster-local').value;
+            gameState.rosterText.visitante = document.getElementById('modal-roster-visitante').value;
+
+            syncData();
+            closeSetupModal();
         }
 
         function getGameMinuteFormatted() {
@@ -318,12 +399,13 @@
             const indicator = document.getElementById('view-indicator');
             const layoutControls = document.getElementById('public-layout-controls');
             const periodSelectorControls = document.getElementById('period-selector-controls');
+            const btnOpenSetup = document.getElementById('btn-open-setup');
 
             if (mode === 'control') {
                 indicator.innerText = '⚙️ Modo Mesa de Control';
                 layoutControls.classList.add('hidden');
+                btnOpenSetup.classList.remove('hidden');
                 
-                // Forzar distribución lado a lado en la Mesa de Control
                 document.getElementById('teams-grid').className = "grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6";
                 
                 periodSelectorControls.style.display = 'flex';
@@ -334,9 +416,9 @@
             } else {
                 indicator.innerText = '📺 Vista Pública / Espectador';
                 layoutControls.classList.remove('hidden');
+                btnOpenSetup.classList.add('hidden');
                 periodSelectorControls.style.display = 'none';
                 
-                // Aplicar preferencia elegida por el usuario
                 setPublicLayout(publicLayoutMode);
             }
             listenToDatabase();
@@ -349,6 +431,7 @@
             document.getElementById('controls-visitante').classList.add('hidden');
             document.getElementById('cronometro-controls').classList.add('hidden');
             document.getElementById('general-controls').classList.add('hidden');
+            document.getElementById('btn-open-setup').classList.add('hidden');
             document.getElementById('period-selector-controls').style.display = 'none';
         }
 
@@ -456,6 +539,7 @@
                     isTimerRunning: false,
                     playerPoints: { local: {}, visitante: {} },
                     playerFouls: { local: {}, visitante: {} },
+                    rosterText: { local: '', visitante: '' },
                     logs: []
                 };
                 syncData();
@@ -499,13 +583,30 @@
             renderPlayerPoints('visitante', gameState.playerPoints?.visitante || {});
             renderPlayerFouls('local', gameState.playerFouls?.local || {});
             renderPlayerFouls('visitante', gameState.playerFouls?.visitante || {});
+            renderRosterDisplay('local', gameState.rosterText?.local || '');
+            renderRosterDisplay('visitante', gameState.rosterText?.visitante || '');
             renderLogs(gameState.logs || []);
 
             const btnTimer = document.getElementById('btn-timer');
             if (btnTimer) {
                 btnTimer.innerText = gameState.isTimerRunning ? "Pausar" : "Iniciar";
-                btnTimer.className = gameState.isTimerRunning ? "bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition" : "bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition";
+                btnTimer.className = gameState.isTimerRunning ? "bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition cursor-pointer" : "bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition cursor-pointer";
             }
+        }
+
+        function renderRosterDisplay(team, rosterText) {
+            const container = document.getElementById(`roster-display-${team}`);
+            if (!rosterText || rosterText.trim() === '') {
+                container.innerHTML = `<span class="text-slate-500 italic">Sin plantilla registrada</span>`;
+                return;
+            }
+
+            const lines = rosterText.split('\n').filter(line => line.trim() !== '');
+            container.innerHTML = lines.map(line => `
+                <span class="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-300 font-mono text-[11px]">
+                    ${line}
+                </span>
+            `).join('');
         }
 
         function renderPlayerPoints(team, pointsObj) {
