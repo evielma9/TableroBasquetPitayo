@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Validación de Jugadores</title>
+    <title>Tablero de Básquetbol con Validación Estricta</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -46,7 +46,7 @@
                 <div class="bg-slate-950 p-4 rounded-2xl border border-blue-900/40">
                     <h3 class="text-sm font-bold text-blue-400 uppercase mb-3">Equipo Local</h3>
                     <label class="block text-xs text-slate-400 mb-1">Nombre del Equipo:</label>
-                    <input type="text" id="modal-name-local" placeholder="Ej. Lakers" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold mb-4 focus:outline-none focus:border-blue-500">
+                    <input type="text" id="modal-name-local" placeholder="Ej. Lakers" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold mb-4 focus:outline-none focus:border-blue-500 uppercase">
                     
                     <label class="block text-xs text-slate-400 mb-1">Plantilla de Jugadores (N° - Nombre):</label>
                     <textarea id="modal-roster-local" placeholder="23 - Carlos López&#10;10 - Juan Pérez&#10;7 - Pedro Sánchez" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 h-36 font-mono focus:outline-none focus:border-blue-500"></textarea>
@@ -56,7 +56,7 @@
                 <div class="bg-slate-950 p-4 rounded-2xl border border-amber-900/40">
                     <h3 class="text-sm font-bold text-amber-400 uppercase mb-3">Equipo Visitante</h3>
                     <label class="block text-xs text-slate-400 mb-1">Nombre del Equipo:</label>
-                    <input type="text" id="modal-name-visitante" placeholder="Ej. Celtics" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold mb-4 focus:outline-none focus:border-amber-500">
+                    <input type="text" id="modal-name-visitante" placeholder="Ej. Celtics" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold mb-4 focus:outline-none focus:border-amber-500 uppercase">
                     
                     <label class="block text-xs text-slate-400 mb-1">Plantilla de Jugadores (N° - Nombre):</label>
                     <textarea id="modal-roster-visitante" placeholder="11 - Kyrie Irving&#10;0 - Jayson Tatum&#10;36 - Marcus Smart" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 h-36 font-mono focus:outline-none focus:border-amber-500"></textarea>
@@ -342,8 +342,8 @@
         }
 
         function saveSetupModal() {
-            gameState.localName = document.getElementById('modal-name-local').value.trim() || 'LOCAL';
-            gameState.visitanteName = document.getElementById('modal-name-visitante').value.trim() || 'VISITANTE';
+            gameState.localName = document.getElementById('modal-name-local').value.trim().toUpperCase() || 'LOCAL';
+            gameState.visitanteName = document.getElementById('modal-name-visitante').value.trim().toUpperCase() || 'VISITANTE';
             
             if (!gameState.rosterText) gameState.rosterText = {};
             gameState.rosterText.local = document.getElementById('modal-roster-local').value;
@@ -353,16 +353,15 @@
             closeSetupModal();
         }
 
-        // OBTENER NÚMEROS REGISTRADOS DE LA PLANTILLA
+        // VALIDACIÓN ESTRICTA USANDO LA PLANTILLA GUARDADA EN EL ESTADO GLOBAL
         function getRegisteredPlayerNumbers(team) {
             const text = gameState.rosterText?.[team] || '';
-            if (!text.trim()) return null; // Si no hay lista cargada, se permite cualquier número
+            if (!text.trim()) return null; // Si no hay plantilla cargada, permite cualquier número
 
             const lines = text.split('\n');
             const numbers = new Set();
 
             lines.forEach(line => {
-                // Busca el primer número al inicio o antes de un guion/espacio
                 const match = line.match(/^\s*#?(\d+)/);
                 if (match) {
                     numbers.add(match[1]);
@@ -444,7 +443,7 @@
         }
 
         function changeModePrompt() {
-            document.getElementById('mode-selector').classList.remove('hidden');
+            document.getElementById('mode-selector').classList.add('hidden');
             document.getElementById('app-container').classList.add('hidden');
             document.getElementById('controls-local').classList.add('hidden');
             document.getElementById('controls-visitante').classList.add('hidden');
@@ -452,6 +451,7 @@
             document.getElementById('general-controls').classList.add('hidden');
             document.getElementById('btn-open-setup').classList.add('hidden');
             document.getElementById('period-selector-controls').style.display = 'none';
+            document.getElementById('mode-selector').classList.remove('hidden');
         }
 
         function syncData() {
@@ -466,12 +466,11 @@
             const playerInput = document.getElementById(`input-jugador-${team}`);
             const playerNum = playerInput.value.trim();
 
-            // Validación de jugador contra la plantilla registrada
             if (playerNum) {
                 const validNumbers = getRegisteredPlayerNumbers(team);
                 if (validNumbers && !validNumbers.has(playerNum)) {
                     const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-                    alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla de ${teamName}. Por favor verifica el número o regístralo en 'Configurar Equipos y Planteles'.`);
+                    alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
                     return;
                 }
             }
@@ -513,11 +512,10 @@
                 return;
             }
 
-            // Validación de jugador contra la plantilla registrada
             const validNumbers = getRegisteredPlayerNumbers(team);
             if (validNumbers && !validNumbers.has(playerNum)) {
                 const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-                alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla de ${teamName}. Por favor verifica el número o regístralo en 'Configurar Equipos y Planteles'.`);
+                alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
                 return;
             }
 
@@ -604,7 +602,6 @@
             document.getElementById('faltas-visitante').innerText = gameState.visitanteFouls;
             document.getElementById('display-periodo').innerText = gameState.period;
 
-            // Actualización instantánea de nombres sin importar qué elemento esté activo
             if (currentMode !== 'control' || document.activeElement !== document.getElementById('nombre-local')) {
                 document.getElementById('nombre-local').value = gameState.localName || 'LOCAL';
             }
