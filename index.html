@@ -261,8 +261,21 @@
             </div>
         </section>
 
-        <!-- BOTÓN DE REINICIO GENERAL -->
-        <div id="general-controls" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 flex justify-end">
+        <!-- PANEL DE COMPARTIR Y REINICIO -->
+        <div id="general-controls" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">📤 Compartir Estadísticas:</span>
+                <button onclick="sendViaWhatsApp()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                    💬 WhatsApp
+                </button>
+                <button onclick="sendViaEmail()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                    ✉️ Correo
+                </button>
+                <button onclick="sendToSharePoint()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                    ☁️ SharePoint (Power Automate)
+                </button>
+            </div>
+
             <button onclick="resetMatch()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-600/30 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer">
                 🔄 Reiniciar Partido Completo
             </button>
@@ -356,7 +369,7 @@
         // VALIDACIÓN ESTRICTA USANDO LA PLANTILLA GUARDADA EN EL ESTADO GLOBAL
         function getRegisteredPlayerNumbers(team) {
             const text = gameState.rosterText?.[team] || '';
-            if (!text.trim()) return null; // Si no hay plantilla cargada, permite cualquier número
+            if (!text.trim()) return null; 
 
             const lines = text.split('\n');
             const numbers = new Set();
@@ -409,6 +422,79 @@
             gameState.logs.unshift(logItem);
         }
 
+        // --- FUNCIONES DE COMPARTIR Y ENVÍO DE ESTADÍSTICAS ---
+        function generateMatchSummaryText() {
+            let summary = `🏀 *REPORTE FINAL DE PARTIDO* 🏀\n\n`;
+            summary = summary + `🏠 *${gameState.localName}*: ${gameState.localScore} pts (Faltas: ${gameState.localFouls})\n`;
+            summary = summary + `✈️ *${gameState.visitanteName}*: ${gameState.visitanteScore} pts (Faltas: ${gameState.visitanteFouls})\n\n`;
+            
+            summary = summary + `📊 *Anotadores - ${gameState.localName}*:\n`;
+            const localScorers = Object.entries(gameState.playerPoints?.local || {});
+            if (localScorers.length === 0) {
+                summary = summary + `(Sin registros)\n`;
+            } else {
+                localScorers.forEach(([num, pts]) => { summary = summary + `- #${num}: ${pts} pts\n`; });
+            }
+
+            summary = summary + `\n📊 *Anotadores - ${gameState.visitanteName}*:\n`;
+            const visitanteScorers = Object.entries(gameState.playerPoints?.visitante || {});
+            if (visitanteScorers.length === 0) {
+                summary = summary + `(Sin registros)\n`;
+            } else {
+                visitanteScorers.forEach(([num, pts]) => { summary = summary + `- #${num}: ${pts} pts\n`; });
+            }
+
+            return summary;
+        }
+
+        function sendViaWhatsApp() {
+            const text = encodeURIComponent(generateMatchSummaryText());
+            window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+        }
+
+        function sendViaEmail() {
+            const subject = encodeURIComponent(`Resultado Final: ${gameState.localName} vs ${gameState.visitanteName}`);
+            const body = encodeURIComponent(generateMatchSummaryText());
+            window.location.href = `mailto:?subject=${subject}&body=${body}`;
+        }
+
+        async function sendToSharePoint() {
+            // Reemplaza esta URL con la URL HTTP POST que te proporcione tu flujo de Power Automate
+            const powerAutomateUrl = prompt("Ingresa la URL HTTP Endpoint de tu Power Automate (SharePoint):", "https://prod-XX.westus.logic.azure.com:443/workflows/...");
+            
+            if (!powerAutomateUrl) return;
+
+            const payload = {
+                fecha: new Date().toISOString(),
+                localEquipo: gameState.localName,
+                localPuntuacion: gameState.localScore,
+                localFaltas: gameState.localFouls,
+                visitanteEquipo: gameState.visitanteName,
+                visitantePuntuacion: gameState.visitanteScore,
+                visitanteFaltas: gameState.visitanteFouls,
+                estadisticasDetalladas: gameState.playerPoints,
+                bitacora: gameState.logs
+            };
+
+            try {
+                const response = await fetch(powerAutomateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    alert("✅ ¡Estadísticas enviadas correctamente a Power Automate / SharePoint!");
+                } else {
+                    alert("⚠️ El servidor respondió con un error. Verifica la URL del flujo.");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("❌ Error de conexión al intentar enviar los datos a Power Automate.");
+            }
+        }
+        // -----------------------------------------------------
+
         function selectMode(mode) {
             currentMode = mode;
             document.getElementById('mode-selector').classList.add('hidden');
@@ -430,12 +516,14 @@
                 document.getElementById('controls-local').classList.remove('hidden');
                 document.getElementById('controls-visitante').classList.remove('hidden');
                 document.getElementById('cronometro-controls').classList.remove('hidden');
-                document.getElementById('general-controls').classList.remove('hidden');
+                document.getElementById('general-controls').classList.remove('flex'); // Se ajusta con flex arriba
+                document.getElementById('general-controls').style.display = 'flex';
             } else {
                 indicator.innerText = '📺 Vista Pública / Espectador';
                 layoutControls.classList.remove('hidden');
                 btnOpenSetup.classList.add('hidden');
                 periodSelectorControls.style.display = 'none';
+                document.getElementById('general-controls').style.display = 'none';
                 
                 setPublicLayout(publicLayoutMode);
             }
@@ -448,7 +536,7 @@
             document.getElementById('controls-local').classList.add('hidden');
             document.getElementById('controls-visitante').classList.add('hidden');
             document.getElementById('cronometro-controls').classList.add('hidden');
-            document.getElementById('general-controls').classList.add('hidden');
+            document.getElementById('general-controls').style.display = 'none';
             document.getElementById('btn-open-setup').classList.add('hidden');
             document.getElementById('period-selector-controls').style.display = 'none';
             document.getElementById('mode-selector').classList.remove('hidden');
