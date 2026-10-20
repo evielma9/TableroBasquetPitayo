@@ -366,7 +366,6 @@
             closeSetupModal();
         }
 
-        // VALIDACIÓN ESTRICTA USANDO LA PLANTILLA GUARDADA EN EL ESTADO GLOBAL
         function getRegisteredPlayerNumbers(team) {
             const text = gameState.rosterText?.[team] || '';
             if (!text.trim()) return null; 
@@ -382,6 +381,21 @@
             });
 
             return numbers.size > 0 ? numbers : null;
+        }
+
+        // FUNCIÓN AUXILIAR PARA EXTRAER EL NOMBRE DEL JUGADOR DESDE LA PLANTILLA
+        function getPlayerName(team, playerNum) {
+            const text = gameState.rosterText?.[team] || '';
+            if (!text.trim()) return `Jugador #${playerNum}`;
+
+            const lines = text.split('\n');
+            for (let line of lines) {
+                const match = line.match(/^\s*#?(\d+)\s*[-–]?\s*(.+)$/);
+                if (match && match[1] === String(playerNum)) {
+                    return match[2].trim();
+                }
+            }
+            return `Jugador #${playerNum}`;
         }
 
         function getGameMinuteFormatted() {
@@ -422,58 +436,90 @@
             gameState.logs.unshift(logItem);
         }
 
-        // --- FUNCIONES DE COMPARTIR Y ENVÍO DE ESTADÍSTICAS ---
-        function generateMatchSummaryText() {
+        // --- CONSTRUCTOR DE TABLAS DE ESTADÍSTICAS EN TEXTO (PARA WHATSAPP / CORREO) ---
+        function generateStructuredTableText() {
             let summary = `🏀 *REPORTE FINAL DE PARTIDO* 🏀\n\n`;
-            summary = summary + `🏠 *${gameState.localName}*: ${gameState.localScore} pts (Faltas: ${gameState.localFouls})\n`;
-            summary = summary + `✈️ *${gameState.visitanteName}*: ${gameState.visitanteScore} pts (Faltas: ${gameState.visitanteFouls})\n\n`;
+            summary += `🏠 *${gameState.localName}*: ${gameState.localScore} pts (Faltas Eq: ${gameState.localFouls})\n`;
+            summary += `✈️ *${gameState.visitanteName}*: ${gameState.visitanteScore} pts (Faltas Eq: ${gameState.visitanteFouls})\n\n`;
             
-            summary = summary + `📊 *Anotadores - ${gameState.localName}*:\n`;
-            const localScorers = Object.entries(gameState.playerPoints?.local || {});
-            if (localScorers.length === 0) {
-                summary = summary + `(Sin registros)\n`;
+            // Tabla Local
+            summary += `📋 *TABLA - ${gameState.localName}*:\n`;
+            summary += `\`No. | Nombre         | Pts | Flt\`\n`;
+            summary += `\`--------------------------------\`\n`;
+            
+            const localNumbers = new Set([...Object.keys(gameState.playerPoints?.local || {}), ...Object.keys(gameState.playerFouls?.local || {})]);
+            if (localNumbers.size === 0) {
+                summary += `*(Sin registros individuales)*\n`;
             } else {
-                localScorers.forEach(([num, pts]) => { summary = summary + `- #${num}: ${pts} pts\n`; });
+                localNumbers.forEach(num => {
+                    const name = getPlayerName('local', num).padEnd(14, ' ').substring(0, 14);
+                    const pts = String(gameState.playerPoints?.local?.[num] || 0).padStart(3, ' ');
+                    const flt = String(gameState.playerFouls?.local?.[num] || 0).padStart(3, ' ');
+                    summary += `\`#${num.padEnd(2, ' ')} \vert{}${name} | ${pts} \vert{}${flt}\`\n`;
+                });
             }
 
-            summary = summary + `\n📊 *Anotadores - ${gameState.visitanteName}*:\n`;
-            const visitanteScorers = Object.entries(gameState.playerPoints?.visitante || {});
-            if (visitanteScorers.length === 0) {
-                summary = summary + `(Sin registros)\n`;
+            summary += `\n`;
+
+            // Tabla Visitante
+            summary += `📋 *TABLA - ${gameState.visitanteName}*:\n`;
+            summary += `\`No. | Nombre         | Pts | Flt\`\n`;
+            summary += `\`--------------------------------\`\n`;
+            
+            const visitanteNumbers = new Set([...Object.keys(gameState.playerPoints?.visitante || {}), ...Object.keys(gameState.playerFouls?.visitante || {})]);
+            if (visitanteNumbers.size === 0) {
+                summary += `*(Sin registros individuales)*\n`;
             } else {
-                visitanteScorers.forEach(([num, pts]) => { summary = summary + `- #${num}: ${pts} pts\n`; });
+                visitanteNumbers.forEach(num => {
+                    const name = getPlayerName('visitante', num).padEnd(14, ' ').substring(0, 14);
+                    const pts = String(gameState.playerPoints?.visitante?.[num] || 0).padStart(3, ' ');
+                    const flt = String(gameState.playerFouls?.visitante?.[num] || 0).padStart(3, ' ');
+                    summary += `\`#${num.padEnd(2, ' ')} \vert{}${name} | ${pts} \vert{}${flt}\`\n`;
+                });
+            }
+
+            summary += `\n📜 *RESUMEN DE JUGADAS Y MINUTOS*:\n`;
+            if (!gameState.logs || gameState.logs.length === 0) {
+                summary += `(Sin bitácora)\n`;
+            } else {
+                gameState.logs.slice(0, 15).forEach(log => {
+                    summary += `• [${log.timeLabel}] ${log.text}\n`;
+                });
             }
 
             return summary;
         }
 
         function sendViaWhatsApp() {
-            const text = encodeURIComponent(generateMatchSummaryText());
+            const text = encodeURIComponent(generateStructuredTableText());
             window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
         }
 
         function sendViaEmail() {
-            const subject = encodeURIComponent(`Resultado Final: ${gameState.localName} vs ${gameState.visitanteName}`);
-            const body = encodeURIComponent(generateMatchSummaryText());
+            const subject = encodeURIComponent(`Resultado Final en Tabla: ${gameState.localName} vs ${gameState.visitanteName}`);
+            const body = encodeURIComponent(generateStructuredTableText());
             window.location.href = `mailto:?subject=${subject}&body=${body}`;
         }
 
         async function sendToSharePoint() {
-            // Reemplaza esta URL con la URL HTTP POST que te proporcione tu flujo de Power Automate
             const powerAutomateUrl = prompt("Ingresa la URL HTTP Endpoint de tu Power Automate (SharePoint):", "https://prod-XX.westus.logic.azure.com:443/workflows/...");
             
             if (!powerAutomateUrl) return;
 
+            // Estructura de tablas limpia en formato JSON para Power Automate / SharePoint
             const payload = {
                 fecha: new Date().toISOString(),
                 localEquipo: gameState.localName,
                 localPuntuacion: gameState.localScore,
-                localFaltas: gameState.localFouls,
+                localFaltasEquipo: gameState.localFouls,
                 visitanteEquipo: gameState.visitanteName,
                 visitantePuntuacion: gameState.visitanteScore,
-                visitanteFaltas: gameState.visitanteFouls,
-                estadisticasDetalladas: gameState.playerPoints,
-                bitacora: gameState.logs
+                visitanteFaltasEquipo: gameState.visitanteFouls,
+                plantelLocalEstadisticas: gameState.playerPoints?.local || {},
+                faltasLocalEstadisticas: gameState.playerFouls?.local || {},
+                plantelVisitanteEstadisticas: gameState.playerPoints?.visitante || {},
+                faltasVisitanteEstadisticas: gameState.playerFouls?.visitante || {},
+                bitacoraDetalladaConMinutos: gameState.logs
             };
 
             try {
@@ -484,7 +530,7 @@
                 });
 
                 if (response.ok) {
-                    alert("✅ ¡Estadísticas enviadas correctamente a Power Automate / SharePoint!");
+                    alert("✅ ¡Tabla de estadísticas enviada correctamente a Power Automate / SharePoint!");
                 } else {
                     alert("⚠️ El servidor respondió con un error. Verifica la URL del flujo.");
                 }
@@ -493,7 +539,7 @@
                 alert("❌ Error de conexión al intentar enviar los datos a Power Automate.");
             }
         }
-        // -----------------------------------------------------
+        // ------------------------------------------------------------------------
 
         function selectMode(mode) {
             currentMode = mode;
@@ -516,7 +562,6 @@
                 document.getElementById('controls-local').classList.remove('hidden');
                 document.getElementById('controls-visitante').classList.remove('hidden');
                 document.getElementById('cronometro-controls').classList.remove('hidden');
-                document.getElementById('general-controls').classList.remove('flex'); // Se ajusta con flex arriba
                 document.getElementById('general-controls').style.display = 'flex';
             } else {
                 indicator.innerText = '📺 Vista Pública / Espectador';
@@ -573,7 +618,8 @@
             }
 
             const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-            const playerDesc = playerNum ? `Jugador #${playerNum}` : `Equipo`;
+            const playerName = playerNum ? getPlayerName(team, playerNum) : 'Equipo';
+            const playerDesc = playerNum ? `#${playerNum} ${playerName}` : `Equipo`;
             addLogEntry(`🏀 ${playerDesc} (${teamName}) anotó ${points} pt(s).`, team);
 
             syncData();
@@ -615,8 +661,9 @@
             gameState.playerFouls[team][playerNum] = (gameState.playerFouls[team][playerNum] || 0) + 1;
 
             const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
+            const playerName = getPlayerName(team, playerNum);
             const currentFouls = gameState.playerFouls[team][playerNum];
-            addLogEntry(`⚠️ Falta cometida por Jugador #${playerNum} (${teamName}) [Acumula ${currentFouls} FLT].`, team);
+            addLogEntry(`⚠️ Falta de #${playerNum} ${playerName} (${teamName}) [Acumula ${currentFouls} FLT].`, team);
 
             syncData();
         }
