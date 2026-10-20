@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Totales por Equipo</title>
+    <title>Tablero de Básquetbol con Gestión de Faltas y Puntos</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -160,9 +160,12 @@
                         <button onclick="scoreWithPlayer('local', 3)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition cursor-pointer">+3 PTS</button>
                         <button onclick="scoreWithPlayer('local', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1 PT</button>
                     </div>
-                    <div class="flex items-center gap-2 pt-2">
-                        <button onclick="foulWithPlayer('local')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1 cursor-pointer">
-                            + Registrar Falta a Jugador N°
+                    <div class="grid grid-cols-2 gap-2 pt-2">
+                        <button onclick="foulWithPlayer('local', 1)" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold cursor-pointer">
+                            + Falta Jugador
+                        </button>
+                        <button onclick="foulWithPlayer('local', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg font-semibold cursor-pointer">
+                            - Quitar Falta
                         </button>
                     </div>
                 </div>
@@ -219,9 +222,12 @@
                         <button onclick="scoreWithPlayer('visitante', 3)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition cursor-pointer">+3 PTS</button>
                         <button onclick="scoreWithPlayer('visitante', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1 PT</button>
                     </div>
-                    <div class="flex items-center gap-2 pt-2">
-                        <button onclick="foulWithPlayer('visitante')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1 cursor-pointer">
-                            + Registrar Falta a Jugador N°
+                    <div class="grid grid-cols-2 gap-2 pt-2">
+                        <button onclick="foulWithPlayer('visitante', 1)" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold cursor-pointer">
+                            + Falta Jugador
+                        </button>
+                        <button onclick="foulWithPlayer('visitante', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg font-semibold cursor-pointer">
+                            - Quitar Falta
                         </button>
                     </div>
                 </div>
@@ -273,7 +279,7 @@
                         </tr>
                     </tbody>
                     <tfoot id="consolidated-table-foot">
-                        <!-- Aquí se inyectan dinámicamente los totales -->
+                        <!-- Totales inyectados dinámicamente -->
                     </tfoot>
                 </table>
             </div>
@@ -372,7 +378,6 @@
             }
         }
 
-        // MODAL CONFIGURACIÓN
         function openSetupModal() {
             document.getElementById('modal-name-local').value = gameState.localName || 'LOCAL';
             document.getElementById('modal-name-visitante').value = gameState.visitanteName || 'VISITANTE';
@@ -682,13 +687,14 @@
             syncData();
         }
 
-        function foulWithPlayer(team) {
+        // CONTROL ESTRICTO DE FALTAS (SUMAR O RESTAR POR JUGADOR)
+        function foulWithPlayer(team, amount) {
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
             const playerNum = playerInput.value.trim();
 
             if (!playerNum) {
-                alert("⚠️ Debes ingresar el número del jugador en el campo 'N° Jugador' para registrar una falta.");
+                alert("⚠️ Debes ingresar el número del jugador en el campo 'N° Jugador' para registrar o corregir faltas.");
                 return;
             }
 
@@ -699,17 +705,35 @@
                 return;
             }
 
-            if (team === 'local') gameState.localFouls++;
-            else gameState.visitanteFouls++;
+            // Si amount es negativo (-1), validamos que el jugador tenga faltas registradas
+            if (amount < 0) {
+                const currentFlt = gameState.playerFouls?.[team]?.[playerNum] || 0;
+                if (currentFlt <= 0) {
+                    alert(`⚠️ El jugador #${playerNum} tiene 0 faltas registradas; no se le pueden restar más faltas.`);
+                    return;
+                }
+            }
 
+            // Actualizar faltas globales del equipo
+            if (team === 'local') gameState.localFouls = Math.max(0, gameState.localFouls + amount);
+            else gameState.visitanteFouls = Math.max(0, gameState.visitanteFouls + amount);
+
+            // Actualizar faltas individuales del jugador
             if (!gameState.playerFouls) gameState.playerFouls = { local: {}, visitante: {} };
             if (!gameState.playerFouls[team]) gameState.playerFouls[team] = {};
-            gameState.playerFouls[team][playerNum] = (gameState.playerFouls[team][playerNum] || 0) + 1;
+            
+            const newPlayerFouls = (gameState.playerFouls[team][playerNum] || 0) + amount;
+            gameState.playerFouls[team][playerNum] = Math.max(0, newPlayerFouls);
 
             const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
             const playerName = getPlayerName(team, playerNum);
             const currentFouls = gameState.playerFouls[team][playerNum];
-            addLogEntry(`⚠️ Falta de #${playerNum} ${playerName} (${teamName}) [Acumula ${currentFouls} FLT].`, team);
+
+            if (amount > 0) {
+                addLogEntry(`⚠️ Falta de #${playerNum} ${playerName} (${teamName}) [Acumula ${currentFouls} FLT].`, team);
+            } else {
+                addLogEntry(`🧹 Corrección: Se quitó 1 falta a #${playerNum} ${playerName} (${teamName}) [Queda con ${currentFouls} FLT].`, team);
+            }
 
             syncData();
         }
@@ -866,7 +890,6 @@
             }).join('');
         }
 
-        // RENDERIZAR TABLA CON COLUMNAS SEPARADAS Y FILA DE TOTALES EN EL TFOOT
         function renderConsolidatedSummaryTable() {
             const tbody = document.getElementById('consolidated-table-body');
             const tfoot = document.getElementById('consolidated-table-foot');
@@ -878,7 +901,6 @@
             let totalLocalSum = 0;
             let totalVisitanteSum = 0;
 
-            // Procesar local
             const localNums = new Set([...Object.keys(gameState.playerPoints?.local || {}), ...Object.keys(gameState.playerFouls?.local || {})]);
             localNums.forEach(num => {
                 if (!playersMap[num]) {
@@ -890,7 +912,6 @@
                 playersMap[num].flt = Math.max(playersMap[num].flt, gameState.playerFouls?.local?.[num] || 0);
             });
 
-            // Procesar visitante
             const visitanteNums = new Set([...Object.keys(gameState.playerPoints?.visitante || {}), ...Object.keys(gameState.playerFouls?.visitante || {})]);
             visitanteNums.forEach(num => {
                 if (!playersMap[num]) {
@@ -922,7 +943,6 @@
                 tfoot.innerHTML = '';
             } else {
                 tbody.innerHTML = rowsHtml;
-                // Inyectar fila de totales en el tfoot
                 tfoot.innerHTML = `
                     <tr class="bg-slate-950/80 border-t-2 border-slate-700 font-bold">
                         <td colspan="2" class="py-3 px-3 text-right uppercase text-slate-300">TOTALES:</td>
