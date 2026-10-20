@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Control de Puntos por Jugador</title>
+    <title>Tablero de Básquetbol con Columnas Separadas de Puntos</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -251,19 +251,19 @@
 
         </div>
 
-        <!-- TABLA RESUMEN GENERAL DE AMBOS EQUIPOS -->
+        <!-- TABLA RESUMEN GENERAL CON COLUMNAS SEPARADAS DE PUNTOS -->
         <section id="summary-table-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl hidden">
             <h3 class="text-sm font-bold text-amber-400 mb-3 uppercase tracking-wider flex items-center gap-2">
-                📊 Resumen Consolidado de Estadísticas (Ambos Equipos)
+                📊 Resumen Consolidado con Puntos Separados por Equipo
             </h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs font-mono">
                     <thead>
                         <tr class="border-b border-slate-800 text-slate-400 uppercase">
-                            <th class="py-2 px-3">Equipo</th>
                             <th class="py-2 px-3">N°</th>
                             <th class="py-2 px-3">Nombre del Jugador</th>
-                            <th class="py-2 px-3 text-center">Puntos (PTS)</th>
+                            <th class="py-2 px-3 text-center text-blue-400" id="th-col-local">Pts Local</th>
+                            <th class="py-2 px-3 text-center text-amber-400" id="th-col-visitante">Pts Visitante</th>
                             <th class="py-2 px-3 text-center">Faltas (FLT)</th>
                         </tr>
                     </thead>
@@ -633,7 +633,6 @@
             matchRef.set(gameState);
         }
 
-        // CONTROL DE PUNTOS CON VALIDACIÓN ESTRICTA (SUMAR O RESTAR POR JUGADOR)
         function scoreWithPlayer(team, points) {
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
@@ -651,7 +650,6 @@
                 return;
             }
 
-            // Si points es negativo (-1), validamos que el jugador tenga puntos suficientes para restar
             if (points < 0) {
                 const currentPts = gameState.playerPoints?.[team]?.[playerNum] || 0;
                 if (currentPts <= 0) {
@@ -660,11 +658,9 @@
                 }
             }
 
-            // Actualizar marcador global
             if (team === 'local') gameState.localScore = Math.max(0, gameState.localScore + points);
             else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
 
-            // Actualizar puntos individuales del jugador
             if (!gameState.playerPoints) gameState.playerPoints = { local: {}, visitante: {} };
             if (!gameState.playerPoints[team]) gameState.playerPoints[team] = {};
             
@@ -683,7 +679,6 @@
             syncData();
         }
 
-        // VALIDACIÓN ESTRICTA AL REGISTRAR FALTAS
         function foulWithPlayer(team) {
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
@@ -868,41 +863,46 @@
             }).join('');
         }
 
+        // RENDERIZAR TABLA CON COLUMNAS SEPARADAS PARA CADA EQUIPO
         function renderConsolidatedSummaryTable() {
             const tbody = document.getElementById('consolidated-table-body');
-            let rowsHtml = '';
+            document.getElementById('th-col-local').innerText = `Pts ${gameState.localName}`;
+            document.getElementById('th-col-visitante').innerText = `Pts ${gameState.visitanteName}`;
 
+            // Unificar todos los jugadores que tengan puntos o faltas en ambos equipos
+            const playersMap = {};
+
+            // Procesar local
             const localNums = new Set([...Object.keys(gameState.playerPoints?.local || {}), ...Object.keys(gameState.playerFouls?.local || {})]);
             localNums.forEach(num => {
-                const name = getPlayerName('local', num);
-                const pts = gameState.playerPoints?.local?.[num] || 0;
-                const flt = gameState.playerFouls?.local?.[num] || 0;
-                if (pts > 0 || flt > 0) {
-                    rowsHtml += `
-                        <tr class="border-b border-slate-800/60 hover:bg-slate-950/50">
-                            <td class="py-2.5 px-3 text-blue-400 font-bold">${gameState.localName}</td>
-                            <td class="py-2.5 px-3 font-bold text-amber-400">#${num}</td>
-                            <td class="py-2.5 px-3 text-slate-200">${name}</td>
-                            <td class="py-2.5 px-3 text-center font-bold text-white">${pts}</td>
-                            <td class="py-2.5 px-3 text-center text-rose-400 font-bold">${flt}</td>
-                        </tr>
-                    `;
+                if (!playersMap[num]) {
+                    playersMap[num] = { name: getPlayerName('local', num), localPts: 0, visitantePts: 0, flt: 0 };
                 }
+                playersMap[num].localPts = gameState.playerPoints?.local?.[num] || 0;
+                playersMap[num].flt = Math.max(playersMap[num].flt, gameState.playerFouls?.local?.[num] || 0);
             });
 
+            // Procesar visitante
             const visitanteNums = new Set([...Object.keys(gameState.playerPoints?.visitante || {}), ...Object.keys(gameState.playerFouls?.visitante || {})]);
             visitanteNums.forEach(num => {
-                const name = getPlayerName('visitante', num);
-                const pts = gameState.playerPoints?.visitante?.[num] || 0;
-                const flt = gameState.playerFouls?.visitante?.[num] || 0;
-                if (pts > 0 || flt > 0) {
+                if (!playersMap[num]) {
+                    playersMap[num] = { name: getPlayerName('visitante', num), localPts: 0, visitantePts: 0, flt: 0 };
+                }
+                playersMap[num].visitantePts = gameState.playerPoints?.visitante?.[num] || 0;
+                // Si el mismo número existe en ambos, sumamos o priorizamos faltas del visitante
+                playersMap[num].flt = Math.max(playersMap[num].flt, gameState.playerFouls?.visitante?.[num] || 0);
+            });
+
+            let rowsHtml = '';
+            Object.entries(playersMap).forEach(([num, data]) => {
+                if (data.localPts > 0 || data.visitantePts > 0 || data.flt > 0) {
                     rowsHtml += `
                         <tr class="border-b border-slate-800/60 hover:bg-slate-950/50">
-                            <td class="py-2.5 px-3 text-amber-400 font-bold">${gameState.visitanteName}</td>
                             <td class="py-2.5 px-3 font-bold text-amber-400">#${num}</td>
-                            <td class="py-2.5 px-3 text-slate-200">${name}</td>
-                            <td class="py-2.5 px-3 text-center font-bold text-white">${pts}</td>
-                            <td class="py-2.5 px-3 text-center text-rose-400 font-bold">${flt}</td>
+                            <td class="py-2.5 px-3 text-slate-200">${data.name}</td>
+                            <td class="py-2.5 px-3 text-center font-bold text-blue-400">${data.localPts > 0 ? data.localPts : '-'}</td>
+                            <td class="py-2.5 px-3 text-center font-bold text-amber-400">${data.visitantePts > 0 ? data.visitantePts : '-'}</td>
+                            <td class="py-2.5 px-3 text-center text-rose-400 font-bold">${data.flt > 0 ? data.flt : '-'}</td>
                         </tr>
                     `;
                 }
