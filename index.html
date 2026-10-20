@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Validación Estricta</title>
+    <title>Tablero de Básquetbol con Validación Estricta y Excel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -264,7 +264,10 @@
         <!-- PANEL DE COMPARTIR Y REINICIO -->
         <div id="general-controls" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
             <div class="flex flex-wrap items-center gap-3">
-                <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">📤 Compartir Estadísticas:</span>
+                <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">📤 Compartir y Reportes:</span>
+                <button onclick="downloadExcelReport()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                    📥 Descargar Excel (.csv)
+                </button>
                 <button onclick="sendViaWhatsApp()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
                     💬 WhatsApp
                 </button>
@@ -272,7 +275,7 @@
                     ✉️ Correo
                 </button>
                 <button onclick="sendToSharePoint()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
-                    ☁️ SharePoint (Power Automate)
+                    ☁️ SharePoint
                 </button>
             </div>
 
@@ -366,9 +369,10 @@
             closeSetupModal();
         }
 
+        // VALIDACIÓN ESTRICTA: Obtener números registrados en la plantilla
         function getRegisteredPlayerNumbers(team) {
             const text = gameState.rosterText?.[team] || '';
-            if (!text.trim()) return null; 
+            if (!text.trim()) return null; // Si no hay plantilla, permite libre
 
             const lines = text.split('\n');
             const numbers = new Set();
@@ -383,7 +387,7 @@
             return numbers.size > 0 ? numbers : null;
         }
 
-        // FUNCIÓN AUXILIAR PARA EXTRAER EL NOMBRE DEL JUGADOR DESDE LA PLANTILLA
+        // FUNCIÓN AUXILIAR PARA OBTENER EL NOMBRE DEL JUGADOR
         function getPlayerName(team, playerNum) {
             const text = gameState.rosterText?.[team] || '';
             if (!text.trim()) return `Jugador #${playerNum}`;
@@ -436,58 +440,75 @@
             gameState.logs.unshift(logItem);
         }
 
-        // --- CONSTRUCTOR DE TABLAS DE ESTADÍSTICAS EN TEXTO (PARA WHATSAPP / CORREO) ---
+        // --- FUNCIONES DE REPORTES Y DESCARGA EN EXCEL ---
         function generateStructuredTableText() {
-            let summary = `🏀 *REPORTE FINAL DE PARTIDO* 🏀\n\n`;
-            summary += `🏠 *${gameState.localName}*: ${gameState.localScore} pts (Faltas Eq: ${gameState.localFouls})\n`;
-            summary += `✈️ *${gameState.visitanteName}*: ${gameState.visitanteScore} pts (Faltas Eq: ${gameState.visitanteFouls})\n\n`;
+            let summary = `🏀 REPORTE FINAL DE PARTIDO 🏀\n\n`;
+            summary += `LOCAL: ${gameState.localName} [${gameState.localScore} pts] (Faltas Eq: ${gameState.localFouls})\n`;
+            summary += `VISITANTE: ${gameState.visitanteName} [${gameState.visitanteScore} pts] (Faltas Eq: ${gameState.visitanteFouls})\n\n`;
             
-            // Tabla Local
-            summary += `📋 *TABLA - ${gameState.localName}*:\n`;
-            summary += `\`No. | Nombre         | Pts | Flt\`\n`;
-            summary += `\`--------------------------------\`\n`;
-            
+            summary += `--- TABLA ESTADÍSTICA ${gameState.localName} ---\n`;
             const localNumbers = new Set([...Object.keys(gameState.playerPoints?.local || {}), ...Object.keys(gameState.playerFouls?.local || {})]);
-            if (localNumbers.size === 0) {
-                summary += `*(Sin registros individuales)*\n`;
-            } else {
-                localNumbers.forEach(num => {
-                    const name = getPlayerName('local', num).padEnd(14, ' ').substring(0, 14);
-                    const pts = String(gameState.playerPoints?.local?.[num] || 0).padStart(3, ' ');
-                    const flt = String(gameState.playerFouls?.local?.[num] || 0).padStart(3, ' ');
-                    summary += `\`#${num.padEnd(2, ' ')} \vert{}${name} | ${pts} \vert{}${flt}\`\n`;
-                });
-            }
+            localNumbers.forEach(num => {
+                const name = getPlayerName('local', num);
+                const pts = gameState.playerPoints?.local?.[num] || 0;
+                const flt = gameState.playerFouls?.local?.[num] || 0;
+                summary += `No.${num} | ${name} | Pts: ${pts} | Flt: ${flt}\n`;
+            });
 
-            summary += `\n`;
-
-            // Tabla Visitante
-            summary += `📋 *TABLA - ${gameState.visitanteName}*:\n`;
-            summary += `\`No. | Nombre         | Pts | Flt\`\n`;
-            summary += `\`--------------------------------\`\n`;
-            
+            summary += `\n--- TABLA ESTADÍSTICA ${gameState.visitanteName} ---\n`;
             const visitanteNumbers = new Set([...Object.keys(gameState.playerPoints?.visitante || {}), ...Object.keys(gameState.playerFouls?.visitante || {})]);
-            if (visitanteNumbers.size === 0) {
-                summary += `*(Sin registros individuales)*\n`;
-            } else {
-                visitanteNumbers.forEach(num => {
-                    const name = getPlayerName('visitante', num).padEnd(14, ' ').substring(0, 14);
-                    const pts = String(gameState.playerPoints?.visitante?.[num] || 0).padStart(3, ' ');
-                    const flt = String(gameState.playerFouls?.visitante?.[num] || 0).padStart(3, ' ');
-                    summary += `\`#${num.padEnd(2, ' ')} \vert{}${name} | ${pts} \vert{}${flt}\`\n`;
-                });
-            }
-
-            summary += `\n📜 *RESUMEN DE JUGADAS Y MINUTOS*:\n`;
-            if (!gameState.logs || gameState.logs.length === 0) {
-                summary += `(Sin bitácora)\n`;
-            } else {
-                gameState.logs.slice(0, 15).forEach(log => {
-                    summary += `• [${log.timeLabel}] ${log.text}\n`;
-                });
-            }
+            visitanteNumbers.forEach(num => {
+                const name = getPlayerName('visitante', num);
+                const pts = gameState.playerPoints?.visitante?.[num] || 0;
+                const flt = gameState.playerFouls?.visitante?.[num] || 0;
+                summary += `No.${num} | ${name} | Pts: ${pts} | Flt: ${flt}\n`;
+            });
 
             return summary;
+        }
+
+        // Descargar archivo Excel (.csv compatible) con el detalle completo
+        function downloadExcelReport() {
+            let csvContent = "\uFEFF"; // BOM para acentos en Excel
+            csvContent += `EQUIPO LOCAL,${gameState.localName},MARCADOR,${gameState.localScore},FALTAS EQ,${gameState.localFouls}\n`;
+            csvContent += `EQUIPO VISITANTE,${gameState.visitanteName},MARCADOR,${gameState.visitanteScore},FALTAS EQ,${gameState.visitanteFouls}\n\n`;
+            
+            csvContent += `--- ESTADISTICAS JUGADORES LOCAL ---\n`;
+            csvContent += `Numero,Nombre,Puntos,Faltas\n`;
+            const localNumbers = new Set([...Object.keys(gameState.playerPoints?.local || {}), ...Object.keys(gameState.playerFouls?.local || {})]);
+            localNumbers.forEach(num => {
+                const name = getPlayerName('local', num);
+                const pts = gameState.playerPoints?.local?.[num] || 0;
+                const flt = gameState.playerFouls?.local?.[num] || 0;
+                csvContent += `${num},"${name}",${pts},${flt}\n`;
+            });
+
+            csvContent += `\n--- ESTADISTICAS JUGADORES VISITANTE ---\n`;
+            csvContent += `Numero,Nombre,Puntos,Faltas\n`;
+            const visitanteNumbers = new Set([...Object.keys(gameState.playerPoints?.visitante || {}), ...Object.keys(gameState.playerFouls?.visitante || {})]);
+            visitanteNumbers.forEach(num => {
+                const name = getPlayerName('visitante', num);
+                const pts = gameState.playerPoints?.visitante?.[num] || 0;
+                const flt = gameState.playerFouls?.visitante?.[num] || 0;
+                csvContent += `${num},"${name}",${pts},${flt}\n`;
+            });
+
+            csvContent += `\n--- BITACORA Y MINUTOS DE JUEGO ---\n`;
+            csvContent += `Minuto,Evento,Equipo\n`;
+            if (gameState.logs) {
+                gameState.logs.forEach(log => {
+                    csvContent += `"[${log.timeLabel}]","${log.text.replace(/"/g, '""')}","${log.team}"\n`;
+                });
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Reporte_${gameState.localName}_vs_${gameState.visitanteName}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function sendViaWhatsApp() {
@@ -496,30 +517,24 @@
         }
 
         function sendViaEmail() {
-            const subject = encodeURIComponent(`Resultado Final en Tabla: ${gameState.localName} vs ${gameState.visitanteName}`);
+            const subject = encodeURIComponent(`Reporte de Partido: ${gameState.localName} vs ${gameState.visitanteName}`);
             const body = encodeURIComponent(generateStructuredTableText());
             window.location.href = `mailto:?subject=${subject}&body=${body}`;
         }
 
         async function sendToSharePoint() {
             const powerAutomateUrl = prompt("Ingresa la URL HTTP Endpoint de tu Power Automate (SharePoint):", "https://prod-XX.westus.logic.azure.com:443/workflows/...");
-            
             if (!powerAutomateUrl) return;
 
-            // Estructura de tablas limpia en formato JSON para Power Automate / SharePoint
             const payload = {
                 fecha: new Date().toISOString(),
                 localEquipo: gameState.localName,
                 localPuntuacion: gameState.localScore,
-                localFaltasEquipo: gameState.localFouls,
                 visitanteEquipo: gameState.visitanteName,
                 visitantePuntuacion: gameState.visitanteScore,
-                visitanteFaltasEquipo: gameState.visitanteFouls,
-                plantelLocalEstadisticas: gameState.playerPoints?.local || {},
-                faltasLocalEstadisticas: gameState.playerFouls?.local || {},
-                plantelVisitanteEstadisticas: gameState.playerPoints?.visitante || {},
-                faltasVisitanteEstadisticas: gameState.playerFouls?.visitante || {},
-                bitacoraDetalladaConMinutos: gameState.logs
+                plantelLocal: gameState.playerPoints?.local || {},
+                plantelVisitante: gameState.playerPoints?.visitante || {},
+                bitacora: gameState.logs
             };
 
             try {
@@ -530,16 +545,16 @@
                 });
 
                 if (response.ok) {
-                    alert("✅ ¡Tabla de estadísticas enviada correctamente a Power Automate / SharePoint!");
+                    alert("✅ ¡Datos enviados a Power Automate / SharePoint exitosamente!");
                 } else {
-                    alert("⚠️ El servidor respondió con un error. Verifica la URL del flujo.");
+                    alert("⚠️ Error en la respuesta del servidor de Power Automate.");
                 }
             } catch (error) {
                 console.error(error);
-                alert("❌ Error de conexión al intentar enviar los datos a Power Automate.");
+                alert("❌ Error de red al intentar conectar con Power Automate.");
             }
         }
-        // ------------------------------------------------------------------------
+        // ----------------------------------------------------
 
         function selectMode(mode) {
             currentMode = mode;
@@ -594,33 +609,34 @@
             matchRef.set(gameState);
         }
 
+        // VALIDACIÓN ESTRICTA AL SUMAR PUNTOS
         function scoreWithPlayer(team, points) {
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
             const playerNum = playerInput.value.trim();
 
-            if (playerNum) {
-                const validNumbers = getRegisteredPlayerNumbers(team);
-                if (validNumbers && !validNumbers.has(playerNum)) {
-                    const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-                    alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
-                    return;
-                }
+            if (!playerNum) {
+                alert("⚠️ Debes ingresar el número del jugador en el campo 'N° Jugador' para sumar puntos.");
+                return;
+            }
+
+            const validNumbers = getRegisteredPlayerNumbers(team);
+            if (validNumbers && !validNumbers.has(playerNum)) {
+                const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
+                alert(`❌ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
+                return;
             }
 
             if (team === 'local') gameState.localScore = Math.max(0, gameState.localScore + points);
             else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
 
-            if (playerNum) {
-                if (!gameState.playerPoints) gameState.playerPoints = { local: {}, visitante: {} };
-                if (!gameState.playerPoints[team]) gameState.playerPoints[team] = {};
-                gameState.playerPoints[team][playerNum] = (gameState.playerPoints[team][playerNum] || 0) + points;
-            }
+            if (!gameState.playerPoints) gameState.playerPoints = { local: {}, visitante: {} };
+            if (!gameState.playerPoints[team]) gameState.playerPoints[team] = {};
+            gameState.playerPoints[team][playerNum] = (gameState.playerPoints[team][playerNum] || 0) + points;
 
             const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-            const playerName = playerNum ? getPlayerName(team, playerNum) : 'Equipo';
-            const playerDesc = playerNum ? `#${playerNum} ${playerName}` : `Equipo`;
-            addLogEntry(`🏀 ${playerDesc} (${teamName}) anotó ${points} pt(s).`, team);
+            const playerName = getPlayerName(team, playerNum);
+            addLogEntry(`🏀 #${playerNum} ${playerName} (${teamName}) anotó ${points} pt(s).`, team);
 
             syncData();
         }
@@ -631,25 +647,26 @@
             else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
 
             const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-            addLogEntry(`Ajuste de puntos (${teamName}): ${points > 0 ? '+' : ''}${points} pt(s).`, team);
+            addLogEntry(`Ajuste general de puntos (${teamName}): ${points > 0 ? '+' : ''}${points} pt(s).`, team);
 
             syncData();
         }
 
+        // VALIDACIÓN ESTRICTA AL REGISTRAR FALTAS
         function foulWithPlayer(team) {
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
             const playerNum = playerInput.value.trim();
 
             if (!playerNum) {
-                alert("Por favor pon el número del jugador en el campo 'N° Jugador'.");
+                alert("⚠️ Debes ingresar el número del jugador en el campo 'N° Jugador' para registrar una falta.");
                 return;
             }
 
             const validNumbers = getRegisteredPlayerNumbers(team);
             if (validNumbers && !validNumbers.has(playerNum)) {
                 const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-                alert(`⚠️ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
+                alert(`❌ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
                 return;
             }
 
@@ -788,11 +805,14 @@
                 return;
             }
 
-            container.innerHTML = entries.map(([num, pts]) => `
-                <span class="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-slate-200 font-mono">
-                    #${num}: <b class="text-amber-400 font-bold">${pts} pts</b>
-                </span>
-            `).join('');
+            container.innerHTML = entries.map(([num, pts]) => {
+                const name = getPlayerName(team, num);
+                return `
+                    <span class="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-slate-200 font-mono">
+                        #${num} ${name}: <b class="text-amber-400 font-bold">${pts} pts</b>
+                    </span>
+                `;
+            }).join('');
         }
 
         function renderPlayerFouls(team, foulsObj) {
@@ -805,11 +825,12 @@
             }
 
             container.innerHTML = entries.map(([num, count]) => {
+                const name = getPlayerName(team, num);
                 const isOut = count >= 5;
                 const badgeColor = isOut ? 'bg-rose-600 text-white font-bold animate-pulse' : 'bg-slate-800/80 text-rose-300 border border-rose-900/50';
                 return `
                     <span class="px-2.5 py-1 rounded-md text-xs font-mono ${badgeColor}">
-                        #${num}: <b>${count} FLT</b> ${isOut ? '(EXPULSADO)' : ''}
+                        #${num} ${name}: <b>${count} FLT</b> ${isOut ? '(EXPULSADO)' : ''}
                     </span>
                 `;
             }).join('');
