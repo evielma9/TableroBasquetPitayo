@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Tabla Resumen y Excel</title>
+    <title>Tablero de Básquetbol con Control de Puntos por Jugador</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -158,7 +158,7 @@
                         <button onclick="scoreWithPlayer('local', 1)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition cursor-pointer">+1 PT</button>
                         <button onclick="scoreWithPlayer('local', 2)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition cursor-pointer">+2 PTS</button>
                         <button onclick="scoreWithPlayer('local', 3)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition cursor-pointer">+3 PTS</button>
-                        <button onclick="updateScore('local', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1</button>
+                        <button onclick="scoreWithPlayer('local', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1 PT</button>
                     </div>
                     <div class="flex items-center gap-2 pt-2">
                         <button onclick="foulWithPlayer('local')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1 cursor-pointer">
@@ -217,7 +217,7 @@
                         <button onclick="scoreWithPlayer('visitante', 1)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition cursor-pointer">+1 PT</button>
                         <button onclick="scoreWithPlayer('visitante', 2)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition cursor-pointer">+2 PTS</button>
                         <button onclick="scoreWithPlayer('visitante', 3)" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl transition cursor-pointer">+3 PTS</button>
-                        <button onclick="updateScore('visitante', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1</button>
+                        <button onclick="scoreWithPlayer('visitante', -1)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition text-sm cursor-pointer">-1 PT</button>
                     </div>
                     <div class="flex items-center gap-2 pt-2">
                         <button onclick="foulWithPlayer('visitante')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-600/30 text-rose-300 text-xs px-3 py-2 rounded-lg font-semibold flex-1 cursor-pointer">
@@ -251,7 +251,7 @@
 
         </div>
 
-        <!-- NUEVA SECCIÓN: TABLA RESUMEN GENERAL DE AMBOS EQUIPOS -->
+        <!-- TABLA RESUMEN GENERAL DE AMBOS EQUIPOS -->
         <section id="summary-table-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl hidden">
             <h3 class="text-sm font-bold text-amber-400 mb-3 uppercase tracking-wider flex items-center gap-2">
                 📊 Resumen Consolidado de Estadísticas (Ambos Equipos)
@@ -633,48 +633,57 @@
             matchRef.set(gameState);
         }
 
+        // CONTROL DE PUNTOS CON VALIDACIÓN ESTRICTA (SUMAR O RESTAR POR JUGADOR)
         function scoreWithPlayer(team, points) {
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
             const playerNum = playerInput.value.trim();
 
             if (!playerNum) {
-                alert("⚠️ Debes ingresar el número del jugador en el campo 'N° Jugador' para sumar puntos.");
+                alert("⚠️ Debes ingresar el número del jugador en el campo 'N° Jugador'.");
                 return;
             }
 
             const validNumbers = getRegisteredPlayerNumbers(team);
             if (validNumbers && !validNumbers.has(playerNum)) {
                 const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-                alert(`❌ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
+                alert(`❌ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}.`);
                 return;
             }
 
+            // Si points es negativo (-1), validamos que el jugador tenga puntos suficientes para restar
+            if (points < 0) {
+                const currentPts = gameState.playerPoints?.[team]?.[playerNum] || 0;
+                if (currentPts <= 0) {
+                    alert(`⚠️ El jugador #${playerNum} tiene 0 puntos registrados; no se le pueden restar más puntos.`);
+                    return;
+                }
+            }
+
+            // Actualizar marcador global
             if (team === 'local') gameState.localScore = Math.max(0, gameState.localScore + points);
             else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
 
+            // Actualizar puntos individuales del jugador
             if (!gameState.playerPoints) gameState.playerPoints = { local: {}, visitante: {} };
             if (!gameState.playerPoints[team]) gameState.playerPoints[team] = {};
-            gameState.playerPoints[team][playerNum] = (gameState.playerPoints[team][playerNum] || 0) + points;
+            
+            const newPlayerPts = (gameState.playerPoints[team][playerNum] || 0) + points;
+            gameState.playerPoints[team][playerNum] = Math.max(0, newPlayerPts);
 
             const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
             const playerName = getPlayerName(team, playerNum);
-            addLogEntry(`🏀 #${playerNum} ${playerName} (${teamName}) anotó ${points} pt(s).`, team);
+            
+            if (points > 0) {
+                addLogEntry(`🏀 #${playerNum} ${playerName} (${teamName}) anotó +${points} pt(s).`, team);
+            } else {
+                addLogEntry(`🗑️ Corrección: Se restó ${points} pt(s) a #${playerNum} ${playerName} (${teamName}).`, team);
+            }
 
             syncData();
         }
 
-        function updateScore(team, points) {
-            if (currentMode !== 'control') return;
-            if (team === 'local') gameState.localScore = Math.max(0, gameState.localScore + points);
-            else gameState.visitanteScore = Math.max(0, gameState.visitanteScore + points);
-
-            const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-            addLogEntry(`Ajuste general de puntos (${teamName}): ${points > 0 ? '+' : ''}${points} pt(s).`, team);
-
-            syncData();
-        }
-
+        // VALIDACIÓN ESTRICTA AL REGISTRAR FALTAS
         function foulWithPlayer(team) {
             if (currentMode !== 'control') return;
             const playerInput = document.getElementById(`input-jugador-${team}`);
@@ -688,7 +697,7 @@
             const validNumbers = getRegisteredPlayerNumbers(team);
             if (validNumbers && !validNumbers.has(playerNum)) {
                 const teamName = team === 'local' ? gameState.localName : gameState.visitanteName;
-                alert(`❌ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}. Verifica el número o agrégalo en 'Configurar Equipos y Planteles'.`);
+                alert(`❌ El jugador #${playerNum} NO existe en la plantilla guardada de ${teamName}.`);
                 return;
             }
 
@@ -821,7 +830,7 @@
 
         function renderPlayerPoints(team, pointsObj) {
             const container = document.getElementById(`lista-puntos-${team}`);
-            const entries = Object.entries(pointsObj).sort((a, b) => b[1] - a[1]);
+            const entries = Object.entries(pointsObj).filter(([num, pts]) => pts > 0).sort((a, b) => b[1] - a[1]);
 
             if (entries.length === 0) {
                 container.innerHTML = `<span class="text-slate-500 italic">Sin puntos</span>`;
@@ -840,7 +849,7 @@
 
         function renderPlayerFouls(team, foulsObj) {
             const container = document.getElementById(`lista-faltas-${team}`);
-            const entries = Object.entries(foulsObj);
+            const entries = Object.entries(foulsObj).filter(([num, count]) => count > 0);
 
             if (entries.length === 0) {
                 container.innerHTML = `<span class="text-slate-500 italic">Sin faltas</span>`;
@@ -859,7 +868,6 @@
             }).join('');
         }
 
-        // RENDERIZAR TABLA RESUMEN CONSOLIDADA EN LA VISTA DE CONTROL
         function renderConsolidatedSummaryTable() {
             const tbody = document.getElementById('consolidated-table-body');
             let rowsHtml = '';
@@ -869,15 +877,17 @@
                 const name = getPlayerName('local', num);
                 const pts = gameState.playerPoints?.local?.[num] || 0;
                 const flt = gameState.playerFouls?.local?.[num] || 0;
-                rowsHtml += `
-                    <tr class="border-b border-slate-800/60 hover:bg-slate-950/50">
-                        <td class="py-2.5 px-3 text-blue-400 font-bold">${gameState.localName}</td>
-                        <td class="py-2.5 px-3 font-bold text-amber-400">#${num}</td>
-                        <td class="py-2.5 px-3 text-slate-200">${name}</td>
-                        <td class="py-2.5 px-3 text-center font-bold text-white">${pts}</td>
-                        <td class="py-2.5 px-3 text-center text-rose-400 font-bold">${flt}</td>
-                    </tr>
-                `;
+                if (pts > 0 || flt > 0) {
+                    rowsHtml += `
+                        <tr class="border-b border-slate-800/60 hover:bg-slate-950/50">
+                            <td class="py-2.5 px-3 text-blue-400 font-bold">${gameState.localName}</td>
+                            <td class="py-2.5 px-3 font-bold text-amber-400">#${num}</td>
+                            <td class="py-2.5 px-3 text-slate-200">${name}</td>
+                            <td class="py-2.5 px-3 text-center font-bold text-white">${pts}</td>
+                            <td class="py-2.5 px-3 text-center text-rose-400 font-bold">${flt}</td>
+                        </tr>
+                    `;
+                }
             });
 
             const visitanteNums = new Set([...Object.keys(gameState.playerPoints?.visitante || {}), ...Object.keys(gameState.playerFouls?.visitante || {})]);
@@ -885,15 +895,17 @@
                 const name = getPlayerName('visitante', num);
                 const pts = gameState.playerPoints?.visitante?.[num] || 0;
                 const flt = gameState.playerFouls?.visitante?.[num] || 0;
-                rowsHtml += `
-                    <tr class="border-b border-slate-800/60 hover:bg-slate-950/50">
-                        <td class="py-2.5 px-3 text-amber-400 font-bold">${gameState.visitanteName}</td>
-                        <td class="py-2.5 px-3 font-bold text-amber-400">#${num}</td>
-                        <td class="py-2.5 px-3 text-slate-200">${name}</td>
-                        <td class="py-2.5 px-3 text-center font-bold text-white">${pts}</td>
-                        <td class="py-2.5 px-3 text-center text-rose-400 font-bold">${flt}</td>
-                    </tr>
-                `;
+                if (pts > 0 || flt > 0) {
+                    rowsHtml += `
+                        <tr class="border-b border-slate-800/60 hover:bg-slate-950/50">
+                            <td class="py-2.5 px-3 text-amber-400 font-bold">${gameState.visitanteName}</td>
+                            <td class="py-2.5 px-3 font-bold text-amber-400">#${num}</td>
+                            <td class="py-2.5 px-3 text-slate-200">${name}</td>
+                            <td class="py-2.5 px-3 text-center font-bold text-white">${pts}</td>
+                            <td class="py-2.5 px-3 text-center text-rose-400 font-bold">${flt}</td>
+                        </tr>
+                    `;
+                }
             });
 
             if (rowsHtml === '') {
