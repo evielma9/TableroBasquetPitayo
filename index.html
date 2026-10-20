@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Básquetbol con Columnas Separadas de Puntos</title>
+    <title>Tablero de Básquetbol con Totales por Equipo</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Firebase SDK -->
@@ -251,10 +251,10 @@
 
         </div>
 
-        <!-- TABLA RESUMEN GENERAL CON COLUMNAS SEPARADAS DE PUNTOS -->
+        <!-- TABLA RESUMEN GENERAL CON COLUMNAS SEPARADAS Y FILA DE TOTALES -->
         <section id="summary-table-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl hidden">
             <h3 class="text-sm font-bold text-amber-400 mb-3 uppercase tracking-wider flex items-center gap-2">
-                📊 Resumen Consolidado con Puntos Separados por Equipo
+                📊 Resumen Consolidado con Totales por Equipo
             </h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs font-mono">
@@ -272,6 +272,9 @@
                             <td colspan="5" class="py-3 text-center text-slate-500 italic">Sin estadísticas registradas aún...</td>
                         </tr>
                     </tbody>
+                    <tfoot id="consolidated-table-foot">
+                        <!-- Aquí se inyectan dinámicamente los totales -->
+                    </tfoot>
                 </table>
             </div>
         </section>
@@ -863,14 +866,17 @@
             }).join('');
         }
 
-        // RENDERIZAR TABLA CON COLUMNAS SEPARADAS PARA CADA EQUIPO
+        // RENDERIZAR TABLA CON COLUMNAS SEPARADAS Y FILA DE TOTALES EN EL TFOOT
         function renderConsolidatedSummaryTable() {
             const tbody = document.getElementById('consolidated-table-body');
+            const tfoot = document.getElementById('consolidated-table-foot');
+            
             document.getElementById('th-col-local').innerText = `Pts ${gameState.localName}`;
             document.getElementById('th-col-visitante').innerText = `Pts ${gameState.visitanteName}`;
 
-            // Unificar todos los jugadores que tengan puntos o faltas en ambos equipos
             const playersMap = {};
+            let totalLocalSum = 0;
+            let totalVisitanteSum = 0;
 
             // Procesar local
             const localNums = new Set([...Object.keys(gameState.playerPoints?.local || {}), ...Object.keys(gameState.playerFouls?.local || {})]);
@@ -878,7 +884,9 @@
                 if (!playersMap[num]) {
                     playersMap[num] = { name: getPlayerName('local', num), localPts: 0, visitantePts: 0, flt: 0 };
                 }
-                playersMap[num].localPts = gameState.playerPoints?.local?.[num] || 0;
+                const pts = gameState.playerPoints?.local?.[num] || 0;
+                playersMap[num].localPts = pts;
+                totalLocalSum += pts;
                 playersMap[num].flt = Math.max(playersMap[num].flt, gameState.playerFouls?.local?.[num] || 0);
             });
 
@@ -888,8 +896,9 @@
                 if (!playersMap[num]) {
                     playersMap[num] = { name: getPlayerName('visitante', num), localPts: 0, visitantePts: 0, flt: 0 };
                 }
-                playersMap[num].visitantePts = gameState.playerPoints?.visitante?.[num] || 0;
-                // Si el mismo número existe en ambos, sumamos o priorizamos faltas del visitante
+                const pts = gameState.playerPoints?.visitante?.[num] || 0;
+                playersMap[num].visitantePts = pts;
+                totalVisitanteSum += pts;
                 playersMap[num].flt = Math.max(playersMap[num].flt, gameState.playerFouls?.visitante?.[num] || 0);
             });
 
@@ -910,8 +919,18 @@
 
             if (rowsHtml === '') {
                 tbody.innerHTML = `<tr><td colspan="5" class="py-3 text-center text-slate-500 italic">Sin estadísticas registradas aún...</td></tr>`;
+                tfoot.innerHTML = '';
             } else {
                 tbody.innerHTML = rowsHtml;
+                // Inyectar fila de totales en el tfoot
+                tfoot.innerHTML = `
+                    <tr class="bg-slate-950/80 border-t-2 border-slate-700 font-bold">
+                        <td colspan="2" class="py-3 px-3 text-right uppercase text-slate-300">TOTALES:</td>
+                        <td class="py-3 px-3 text-center text-blue-400 text-sm">${totalLocalSum}</td>
+                        <td class="py-3 px-3 text-center text-amber-400 text-sm">${totalVisitanteSum}</td>
+                        <td class="py-3 px-3 text-center text-slate-400">-</td>
+                    </tr>
+                `;
             }
         }
 
